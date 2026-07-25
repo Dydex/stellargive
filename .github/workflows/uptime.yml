@@ -1,0 +1,152 @@
+name: Production Uptime Monitor
+
+# Pings the deployed production frontend every 5 minutes and asserts a
+# healthy (200, TLS) response.
+#
+# On failure:  opens (or updates) a GitHub tracking issue and posts a
+#              Slack / Discord webhook alert.
+# On recovery: closes the tracking issue automatically.
+#
+# Required repo configuration (Settings → Secrets and variables → Actions):
+#   PRODUCTION_URL       (variable)          Production frontend URL to monitor
+#   EXPECTED_CONTENT     (variable, optional) Substring expected in the homepage body
+#   SITE_TIMEOUT_MS       (variable, optional) Per-request timeout in ms (default: 10000)
+#   SLACK_WEBHOOK_URL    (secret, optional)  Slack incoming-webhook URL
+#   DISCORD_WEBHOOK_URL  (secret, optional)  Discord incoming-webhook URL
+#
+# The GITHUB_TOKEN secret is automatically provided — no extra configuration
+# needed for the issue-tracking feature.
+#
+# If PRODUCTION_URL is not configured, the check is skipped (not failed) —
+# an unconfigured monitor is a setup gap, not a production outage.
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  uptime-check:
+    runs-on: ubuntu-latest
+    # Grant write access so the job can open/close tracking issues
+    permissions:
+      issues: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Check production URL is configured
+        id: config
+        run: |
+          if [ -z "${{ vars.PRODUCTION_URL }}" ]; then
+            echo "⚠️ PRODUCTION_URL repo variable is not set — skipping uptime check."
+            echo "has_url=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_url=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Ping production site
+        id: site
+        if: steps.config.outputs.has_url == 'true'
+        continue-on-error: true
+        env:
+          PRODUCTION_URL:      ${{ vars.PRODUCTION_URL }}
+          EXPECTED_CONTENT:    ${{ vars.EXPECTED_CONTENT }}
+          SITE_TIMEOUT_MS:     ${{ vars.SITE_TIMEOUT_MS || '10000' }}
+          SLACK_WEBHOOK_URL:   ${{ secrets.SLACK_WEBHOOK_URL }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: node scripts/monitor-site.js
+
+      # ── On failure: open / update a GitHub tracking issue ───────────────────
+      - name: Open or update outage tracking issue
+        if: steps.config.outputs.has_url == 'true' && steps.site.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO:     ${{ github.repository }}
+          SITE_URL: ${{ vars.PRODUCTION_URL }}
+        run: |
+          TITLE="🚨 Production Outage Detected: $SITE_URL"
+          LABEL="site-outage"
+
+          # Ensure the label exists (idempotent)
+          gh label create "$LABEL" --color "d93f0b" --description "Production frontend uptime alert" \
+            --repo "$REPO" 2>/dev/null || true
+
+          # Find an open issue with the same title to avoid duplicates
+          EXISTING=$(gh issue list \
+            --repo "$REPO" \
+            --state open \
+            --label "$LABEL" \
+            --search "\"$TITLE\" in:title" \
+            --json number \
+            --jq '.[0].number // empty')
+
+          if [ -n "$EXISTING" ]; then
+            echo "ℹ️ Outage issue #$EXISTING already open — adding a comment."
+            gh issue comment "$EXISTING" \
+              --repo "$REPO" \
+              --body "⏰ Still unhealthy as of $(date -u '+%Y-%m-%d %H:%M UTC')."
+          else
+            echo "Creating new outage tracking issue…"
+            gh issue create \
+              --repo "$REPO" \
+              --title "$TITLE" \
+              --label "$LABEL" \
+              --body "## Production Frontend Outage
+
+**URL:** \`$SITE_URL\`
+**Detected at:** $(date -u '+%Y-%m-%d %H:%M UTC')
+**Triggered by:** [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+### What this means
+The scheduled uptime check could not reach the production frontend or received an unexpected response.
+
+### Next steps
+1. Check the Vercel deployment dashboard for build/runtime errors.
+2. Verify DNS and TLS certificate status for the production domain.
+3. Check recent deploys for a regression.
+
+---
+_This issue is managed automatically. It will be closed when the site recovers._"
+          fi
+
+      # ── On recovery: close any open tracking issue ───────────────────────────
+      - name: Close outage tracking issue on recovery
+        if: steps.config.outputs.has_url == 'true' && steps.site.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO:     ${{ github.repository }}
+          SITE_URL: ${{ vars.PRODUCTION_URL }}
+        run: |
+          TITLE="🚨 Production Outage Detected: $SITE_URL"
+          LABEL="site-outage"
+
+          EXISTING=$(gh issue list \
+            --repo "$REPO" \
+            --state open \
+            --label "$LABEL" \
+            --search "\"$TITLE\" in:title" \
+            --json number \
+            --jq '.[0].number // empty')
+
+          if [ -n "$EXISTING" ]; then
+            echo "✅ Site recovered — closing issue #$EXISTING"
+            gh issue comment "$EXISTING" \
+              --repo "$REPO" \
+              --body "✅ Production site is healthy again as of $(date -u '+%Y-%m-%d %H:%M UTC'). Closing."
+            gh issue close "$EXISTING" --repo "$REPO"
+          else
+            echo "No open outage issue found — nothing to close."
+          fi
+
+      # ── Fail the workflow if the uptime check failed ─────────────────────────
+      - name: Propagate uptime failure
+        if: steps.config.outputs.has_url == 'true' && steps.site.outcome == 'failure'
+        run: |
+          echo "❌ Production uptime check failed — see steps above for details."
+          exit 1
