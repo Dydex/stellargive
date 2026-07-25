@@ -10,6 +10,13 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRecentCampaigns, useEvents } from "@/hooks/useSoroban";
 import { fromStroops, type Campaign } from "@/lib/soroban";
+import {
+  MISSING_FIELD,
+  formatEventAmount,
+  getAmountStroops,
+  getCampaignId,
+  getEventField,
+} from "@/lib/eventData";
 import { AddressLink } from "@/components/AddressLink";
 import { useWallet } from "@/lib/WalletProvider";
 import {
@@ -53,28 +60,26 @@ export default function ProfilePage() {
       const all: Campaign[] = campaigns ?? [];
       const created = address ? all.filter((c) => c.creator === address) : [];
 
-      const myDonations = (events ?? []).filter(
-        (e: any) => e.topic === "received" && normalizeAddress(e.data?.[1]) === address,
+      // Events are loosely-typed RPC payloads: a truncated or re-shaped `data`
+      // array must be skipped, never indexed blindly.
+      const allEvents: any[] = Array.isArray(events) ? events : [];
+      const myDonations = allEvents.filter(
+        (e: any) =>
+          e &&
+          typeof e === "object" &&
+          e.topic === "received" &&
+          normalizeAddress(getEventField(e, 1)) === address,
       );
       const supportedIds = new Set(
-        myDonations.map((e: any) => {
-          try {
-            return BigInt(e.data[0]).toString();
-          } catch {
-            return "";
-          }
-        }),
+        myDonations.map((e: any) => getCampaignId(e) ?? "").filter(Boolean),
       );
       const supported = all.filter((c) => supportedIds.has(c.id.toString()));
 
       const totalRaised = created.reduce((acc, c) => acc + c.raised_amount, 0n);
-      const totalDonated = myDonations.reduce((acc: bigint, e: any) => {
-        try {
-          return acc + BigInt(e.data[2]);
-        } catch {
-          return acc;
-        }
-      }, 0n);
+      const totalDonated = myDonations.reduce(
+        (acc: bigint, e: any) => acc + getAmountStroops(e, 2),
+        0n,
+      );
       const activeCount = created.filter((c) => c.status === "Active").length;
 
       return {
@@ -270,21 +275,17 @@ function DonationsSection({
       ) : (
         <div className="flex flex-col gap-4">
           {donations.map((event, idx) => {
-            let campaignId = "";
-            let amount = "";
-            try {
-              campaignId = BigInt(event.data[0]).toString();
-              amount = fromStroops(event.data[2]);
-            } catch {
-              // ignore
-            }
-            const campaign = campaigns.find((c) => c.id.toString() === campaignId);
+            const campaignId = getCampaignId(event);
+            const amount = formatEventAmount(event, 2);
+            const campaign = campaignId
+              ? campaigns.find((c) => c.id.toString() === campaignId)
+              : undefined;
 
             return (
-              <Card key={`${event.id}-${idx}`}>
+              <Card key={`${event?.id ?? "event"}-${idx}`}>
                 <CardContent className="flex flex-col sm:flex-row sm:items-center justify-between p-4 gap-4">
                   <div>
-                    <p className="font-semibold">{amount} XLM Donated</p>
+                    <p className="font-semibold">{amount} Donated</p>
                     {campaign ? (
                       <p className="text-sm text-muted-foreground mt-1">
                         To campaign:{" "}
@@ -295,9 +296,13 @@ function DonationsSection({
                           {campaign.title}
                         </Link>
                       </p>
-                    ) : (
+                    ) : campaignId ? (
                       <p className="text-sm text-muted-foreground mt-1">
                         To campaign ID: <AddressLink address={campaignId} />
+                      </p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        To campaign ID: {MISSING_FIELD}
                       </p>
                     )}
                   </div>

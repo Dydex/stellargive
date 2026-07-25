@@ -95,6 +95,17 @@ function ExploreContent() {
   const campaigns = data?.campaigns ?? EMPTY_CAMPAIGNS;
   const hasMore = data?.hasMore ?? false;
 
+  // useCampaignsPaged keeps the previous page as placeholderData, so a fetch is
+  // either "growing the list" (limit went up — append skeletons) or "refreshing
+  // what's on screen" (same limit — dim the grid and say so).
+  const [loadedLimit, setLoadedLimit] = useState(PAGE_SIZE);
+  useEffect(() => {
+    if (!isFetching) setLoadedLimit(limit);
+  }, [isFetching, limit]);
+
+  const isPaginating = isFetching && limit > loadedLimit;
+  const isRefreshing = isFetching && !isLoading && !isPaginating;
+
   // Debouncing + title/creator/category/description matching lives in the hook.
   const {
     results: searched,
@@ -359,14 +370,35 @@ function ExploreContent() {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filtered.map((campaign) => (
-              <CampaignCard key={campaign.id.toString()} campaign={campaign} />
-            ))}
+          // `relative` anchors the floating "Updating…" pill so showing it never
+          // reflows the grid below.
+          <div className="relative">
+            {isRefreshing && (
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 rounded-full bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground shadow-md">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                Updating...
+              </div>
+            )}
+            <div
+              className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity duration-200 ${
+                isRefreshing ? "opacity-50" : "opacity-100"
+              }`}
+              aria-busy={isRefreshing}
+            >
+              {filtered.map((campaign) => (
+                <CampaignCard key={campaign.id.toString()} campaign={campaign} />
+              ))}
+            </div>
           </div>
         )}
 
-        {!isLoading && isFetching && (
+        <p className="sr-only" role="status" aria-live="polite">
+          {isRefreshing ? "Updating campaigns" : ""}
+        </p>
+
+        {/* Skeletons are appended only while the list is growing, so a
+            background refresh never makes the page jump. */}
+        {isPaginating && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="h-[300px] rounded-xl bg-muted animate-pulse" />
