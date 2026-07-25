@@ -1,4 +1,35 @@
 import { http, HttpResponse } from "msw";
+import { xdr, nativeToScVal, Address } from "@stellar/stellar-sdk";
+
+export function generateCampaignXdr() {
+  const entries = [
+    new xdr.ScMapEntry({ key: nativeToScVal("id", { type: "symbol" }), val: nativeToScVal(1n, { type: "u64" }) }),
+    new xdr.ScMapEntry({ key: nativeToScVal("creator", { type: "symbol" }), val: new Address("GBRPYHIL2CI3WHZDTOOQFC6EB4CGQOFN4L5MHZ5RWBNRUbalxas5F3B2").toScVal() }),
+    new xdr.ScMapEntry({ key: nativeToScVal("beneficiary", { type: "symbol" }), val: new Address("GBRPYHIL2CI3WHZDTOOQFC6EB4CGQOFN4L5MHZ5RWBNRUbalxas5F3B2").toScVal() }),
+    new xdr.ScMapEntry({ key: nativeToScVal("beneficiaries", { type: "symbol" }), val: xdr.ScVal.scvVec([]) }),
+    new xdr.ScMapEntry({ key: nativeToScVal("title", { type: "symbol" }), val: nativeToScVal("Test Campaign", { type: "string" }) }),
+    new xdr.ScMapEntry({ key: nativeToScVal("description", { type: "symbol" }), val: nativeToScVal("A test description", { type: "string" }) }),
+    new xdr.ScMapEntry({ key: nativeToScVal("category", { type: "symbol" }), val: nativeToScVal("medical", { type: "symbol" }) }),
+    new xdr.ScMapEntry({ key: nativeToScVal("target_amount", { type: "symbol" }), val: nativeToScVal(100n, { type: "i128" }) }),
+    new xdr.ScMapEntry({ key: nativeToScVal("raised_amount", { type: "symbol" }), val: nativeToScVal(0n, { type: "i128" }) }),
+    new xdr.ScMapEntry({ key: nativeToScVal("deadline", { type: "symbol" }), val: nativeToScVal(0n, { type: "u64" }) }),
+    new xdr.ScMapEntry({ key: nativeToScVal("accepted_token", { type: "symbol" }), val: new Address("CDLZS3ZCDY7SF3SIVR6Y7I6SN636O27T7G5MKSUIU22ZS76E55WJIPZ4").toScVal() }),
+    new xdr.ScMapEntry({ key: nativeToScVal("status", { type: "symbol" }), val: xdr.ScVal.scvMap([new xdr.ScMapEntry({ key: nativeToScVal("Active", { type: "symbol" }), val: xdr.ScVal.scvVoid() })]) }),
+  ];
+  return xdr.ScVal.scvMap(entries).toXDR("base64");
+}
+
+export function generateCampaignArrayXdr() {
+  const map = xdr.ScVal.fromXDR(generateCampaignXdr(), "base64");
+  return xdr.ScVal.scvVec([map]).toXDR("base64");
+}
+
+export function generateUpdatesArrayXdr() {
+  const entry = new xdr.ScMapEntry({ key: nativeToScVal("content", { type: "symbol" }), val: nativeToScVal("Update 1", { type: "string" }) });
+  const entry2 = new xdr.ScMapEntry({ key: nativeToScVal("timestamp", { type: "symbol" }), val: nativeToScVal(1234567890n, { type: "u64" }) });
+  const map = xdr.ScVal.scvMap([entry, entry2]);
+  return xdr.ScVal.scvVec([map]).toXDR("base64");
+}
 
 export const handlers = [
   http.post("/rpc", async ({ request }) => {
@@ -6,21 +37,47 @@ export const handlers = [
     const method = body.method;
 
     if (method === "simulateTransaction") {
+      const txXdr = body.params?.[0];
+      let xdrResult = "";
+      if (txXdr) {
+        try {
+          const env = xdr.TransactionEnvelope.fromXDR(txXdr, "base64");
+          const op = env.v1().tx().operations()[0].body().invokeHostFunctionOp();
+          const funcName = op.hostFunction().invokeContract().functionName().toString();
+          
+          if (funcName === "get_campaign") {
+            xdrResult = generateCampaignXdr();
+          } else if (funcName === "get_campaigns_paged") {
+            xdrResult = generateCampaignArrayXdr();
+          } else if (funcName === "get_updates") {
+            xdrResult = generateUpdatesArrayXdr();
+          }
+        } catch (e) {
+          console.error("Failed to parse txXdr in MSW handler", e);
+        }
+      }
+
+      const resultObj: any = {
+        transactionData:
+          "AAAAAgAAAABz0nVt8LLjOiO3SXePBhLcVDXIpx3EL0dFxKVpAzXYVAAAZABr3wAAAAAAAAAGAAAAAQAAAAAAAGQAAAAAAAAAAgAAAAAAAAAAAQAA/////wEAAAAGAAABKwAAAADcOcSKqJDqzVBSvjr7mYJqhPPtCVwfqkHzO0A=",
+        minResourceFee: "52521",
+        events: [],
+        restorePreamble: [],
+        supportedInstructionSchemas: [12, 13, 14, 15],
+        cost: {
+          cpuInsns: "1689904",
+          memBytes: "1289276",
+        },
+      };
+
+      if (xdrResult) {
+        resultObj.results = [{ xdr: xdrResult }];
+      }
+
       return HttpResponse.json({
         id: body.id,
         jsonrpc: "2.0",
-        result: {
-          transactionData:
-            "AAAAAgAAAABz0nVt8LLjOiO3SXePBhLcVDXIpx3EL0dFxKVpAzXYVAAAZABr3wAAAAAAAAAGAAAAAQAAAAAAAGQAAAAAAAAAAgAAAAAAAAAAAQAA/////wEAAAAGAAABKwAAAADcOcSKqJDqzVBSvjr7mYJqhPPtCVwfqkHzO0A=",
-          minResourceFee: "52521",
-          events: [],
-          restorePreamble: [],
-          supportedInstructionSchemas: [12, 13, 14, 15],
-          cost: {
-            cpuInsns: "1689904",
-            memBytes: "1289276",
-          },
-        },
+        result: resultObj,
       });
     }
 
