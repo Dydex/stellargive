@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useWallet } from "@/lib/WalletProvider";
 import { useRecentCampaigns, useAddToWhitelist } from "@/hooks/useSoroban";
 import { Shield, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
@@ -129,20 +130,18 @@ export default function AdminPage() {
                 <label htmlFor="campaign-select" className="text-sm font-medium">
                   Select Campaign
                 </label>
-                <select
-                  id="campaign-select"
-                  value={selectedCampaignId}
-                  onChange={(e) => handleSelectCampaign(e.target.value)}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  required
-                >
-                  <option value="">-- Choose a Campaign --</option>
-                  {ownedCampaigns.map((c) => (
-                    <option key={c.id.toString()} value={c.id.toString()}>
-                      {c.title} (ID: {c.id.toString()})
-                    </option>
-                  ))}
-                </select>
+                <Select value={selectedCampaignId} onValueChange={handleSelectCampaign}>
+                  <SelectTrigger id="campaign-select">
+                    <SelectValue placeholder="-- Choose a Campaign --" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ownedCampaigns.map((c) => (
+                      <SelectItem key={c.id.toString()} value={c.id.toString()}>
+                        {c.title} (ID: {c.id.toString()})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2">

@@ -8,6 +8,7 @@ import { WalletConnect } from "@/components/WalletConnect";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { StatCard } from "@/components/ui/stat-card";
 import { useRecentCampaigns, useEvents } from "@/hooks/useSoroban";
 import { fromStroops, type Campaign } from "@/lib/soroban";
 import {
@@ -327,19 +328,6 @@ function DonationsSection({
   );
 }
 
-function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return (
-    <Card>
-      <CardContent className="p-4 space-y-1">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground uppercase font-bold tracking-wider">
-          {icon}
-          {label}
-        </div>
-        <div className="text-2xl font-bold">{value}</div>
-      </CardContent>
-    </Card>
-  );
-}
 
 function Section({
   title,
