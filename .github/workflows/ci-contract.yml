@@ -14,6 +14,7 @@ concurrency:
 jobs:
   change-detection:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       contracts: ${{ steps.filter.outputs.contracts }}
     steps:
@@ -41,6 +42,7 @@ jobs:
     needs: change-detection
     if: ${{ github.event_name == 'merge_group' || needs.change-detection.outputs.contracts == 'true' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -80,6 +82,7 @@ jobs:
     needs: test
     if: always() && failure() && github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Notify Slack
         if: ${{ env.SLACK_WEBHOOK_URL != '' }}

@@ -28,6 +28,7 @@ on:
 jobs:
   uptime-check:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     # Grant write access so the job can open/close tracking issues
     permissions:
       issues: write

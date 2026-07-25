@@ -14,6 +14,7 @@ concurrency:
 jobs:
   change-detection:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       contracts: ${{ steps.filter.outputs.contracts }}
       frontend: ${{ steps.filter.outputs.frontend }}
@@ -48,6 +49,7 @@ jobs:
     needs: change-detection
     if: ${{ github.event_name == 'merge_group' || needs.change-detection.outputs.contracts == 'true' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -107,6 +109,7 @@ jobs:
     needs: change-detection
     if: ${{ github.event_name == 'merge_group' || needs.change-detection.outputs.frontend == 'true' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -278,6 +281,7 @@ jobs:
     needs: [rust-and-contract, frontend]
     if: always() && failure() && github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Notify Slack
         if: ${{ env.SLACK_WEBHOOK_URL != '' }}
