@@ -2,11 +2,19 @@ title = "Gitleaks config for stellarGive"
 
 [allowlist]
   description = "Global allowlist"
+  # Baseline reviewed 2026-07-25 — every path below is a false-positive
+  # source, not a place real secrets are expected to live. Re-justify (or
+  # remove) an entry here whenever it's touched.
   paths = [
+    # Documented example env file — values are placeholders, never real credentials.
     '''frontend/.env\.example$''',
+    # This config's own regexes resemble secret patterns to a scanner.
     '''\.gitleaks\.toml$''',
+    # Lockfile can contain resolved tarball URLs with auth-looking substrings; no real secrets are ever committed here.
     '''package-lock\.json$''',
+    # Rust lockfile; same false-positive shape as package-lock.json.
     '''Cargo\.lock$''',
+    # Auto-generated release notes; may reference commit hashes/PR links that superficially match secret regexes.
     '''CHANGELOG\.md$''',
   ]
 
@@ -28,6 +36,8 @@ title = "Gitleaks config for stellarGive"
   regex = '''(?i)(secret|private[_-]?key|token)\s*[:=]\s*['\"]?([A-Za-z0-9\-_\.]{20,})['\"]?'''
   tags = ["secret", "generic"]
   [rules.allowlist]
+    # Values matching these words are documentation/placeholder text
+    # (e.g. `.env.example`, code comments), not real secrets.
     description = "Allow example/placeholder values"
     regexes = [
       '''(?i)example''',
