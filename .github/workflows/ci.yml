@@ -198,6 +198,78 @@ jobs:
           npx sentry-cli releases set-commits ${{ github.sha }} --auto
           npx sentry-cli releases finalize ${{ github.sha }}
 
+  # Cross-version coverage. The primary `frontend` and `rust-and-contract` jobs
+  # above remain the required status checks (pinned to .nvmrc Node and stable
+  # Rust). These jobs surface breakage on other supported toolchains early.
+  frontend-node-matrix:
+    name: Frontend (Node ${{ matrix.node-version }})
+    needs: change-detection
+    if: ${{ needs.change-detection.outputs.frontend == 'true' }}
+    runs-on: ubuntu-latest
+    # Node 20 is the pinned/supported version (.nvmrc); newer LTS lines are
+    # exercised but non-blocking until adopted.
+    continue-on-error: ${{ matrix.node-version != 20 }}
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [20, 22]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: ESLint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Frontend Test and Coverage
+        working-directory: frontend
+        run: npm run test -- --coverage
+
+  contract-msrv:
+    name: Contract MSRV
+    needs: change-detection
+    if: ${{ needs.change-detection.outputs.contracts == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read MSRV from Cargo.toml
+        id: msrv
+        working-directory: contracts/stellar-give
+        run: |
+          version=$(grep -m1 '^rust-version' Cargo.toml | sed -E 's/.*"([^"]+)".*/\1/')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Declared MSRV: $version"
+
+      - name: Install Rust toolchain (MSRV ${{ steps.msrv.outputs.version }})
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.msrv.outputs.version }}
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: contracts/stellar-give
+
+      - name: Build (MSRV)
+        working-directory: contracts/stellar-give
+        run: cargo build --locked --target wasm32-unknown-unknown --release
+
+      - name: Test (MSRV)
+        working-directory: contracts/stellar-give
+        run: cargo test --locked
+
   notify:
     needs: [rust-and-contract, frontend]
     if: always() && failure() && github.event_name == 'push' && github.ref == 'refs/heads/main'
