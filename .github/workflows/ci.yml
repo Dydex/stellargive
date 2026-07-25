@@ -97,6 +97,42 @@ jobs:
       - name: WASM Optimization Check
         run: bash scripts/build-contract.sh
 
+      - name: Generate WASM size report
+        run: |
+          OPTIMIZED_WASM="contracts/stellar-give/target/wasm32-unknown-unknown/release/stellar_give.optimized.wasm"
+          ORIGINAL_WASM="contracts/stellar-give/target/wasm32-unknown-unknown/release/stellar_give.wasm"
+          ORIG=$(stat -c%s "$ORIGINAL_WASM")
+          OPT=$(stat -c%s "$OPTIMIZED_WASM")
+          REDUCTION=$(( 100 - (OPT * 100 / ORIG) ))
+          {
+            echo "WASM Size Report"
+            echo "================"
+            echo "Commit:    ${{ github.sha }}"
+            echo "Ref:       ${{ github.ref }}"
+            echo "Run:       ${{ github.run_id }}"
+            echo ""
+            echo "Original:  ${ORIG} bytes"
+            echo "Optimized: ${OPT} bytes"
+            echo "Reduction: ${REDUCTION}%"
+            echo "Budget:    65536 bytes (64 KB)"
+            echo "Status:    $([ $OPT -le 65536 ] && echo 'PASS' || echo 'FAIL')"
+          } > wasm-size-report.txt
+          cat wasm-size-report.txt
+
+      # Retention policy:
+      #   30 days — primary build artifacts reviewers need to download and inspect
+      #             (optimized WASM, size report).
+      - name: Upload optimized WASM artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stellar-give-wasm-${{ github.sha }}
+          path: |
+            contracts/stellar-give/target/wasm32-unknown-unknown/release/stellar_give.optimized.wasm
+            wasm-size-report.txt
+          retention-days: 30
+          if-no-files-found: error
+
       - name: Codecov Upload (Rust)
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         uses: codecov/codecov-action@v4

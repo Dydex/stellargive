@@ -76,6 +76,9 @@ jobs:
         with:
           name: contract-test-results
           path: contracts/stellar-give/target/nextest/ci/junit.xml
+          # Retention policy:
+          #   7 days — short-lived debugging artifact; test failures are resolved
+          #             within the PR lifecycle and don't need long-term storage.
           retention-days: 7
 
   notify:
