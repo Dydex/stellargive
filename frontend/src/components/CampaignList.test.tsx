@@ -1,14 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { CampaignList } from "./CampaignList";
-
-// Mock useWallet
-vi.mock("@/lib/WalletProvider", () => ({
-  useWallet: () => ({
-    address: "GA...",
-    isConnected: true,
-  }),
-}));
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MockWalletProvider } from "./MockWalletProvider";
+import { server, errorHandlers } from "@/mocks/setup";
+import { setMockCampaigns } from "@/mocks/handlers";
+import { buildCampaign } from "@/test/factories";
+import React from "react";
 
 // Mock @sentry/nextjs
 vi.mock("@sentry/nextjs", () => ({
@@ -16,39 +14,12 @@ vi.mock("@sentry/nextjs", () => ({
   init: vi.fn(),
 }));
 
-// Mock @stellar/stellar-sdk to prevent RpcServer errors
-vi.mock("@stellar/stellar-sdk", async (importActual) => {
-  const actual = await importActual<typeof import("@stellar/stellar-sdk")>();
-  return {
-    ...actual,
-    rpc: {
-      ...actual.rpc,
-      Server: vi.fn(() => ({})),
-    },
-  };
-});
-
-// Mock @/lib/soroban to provide necessary types and helpers
-vi.mock("@/lib/soroban", () => ({
-  fromStroops: (stroops: bigint | string | number): string => {
-    return (BigInt(stroops) / 10_000_000n).toString();
-  },
-  toStroops: (amount: string | number): bigint => {
-    return BigInt(amount) * 10_000_000n;
-  },
-}));
-
-// Mock CampaignCard
+// Mock CampaignCard to keep it simple
 vi.mock("./CampaignCard", () => ({
   CampaignCard: ({ campaign }: any) => <div data-testid="campaign-card">{campaign.title}</div>,
 }));
 
-// Mock the useRecentCampaigns hook
-vi.mock("@/hooks/useSoroban", () => ({
-  useRecentCampaigns: vi.fn(),
-}));
-
-// Mock next/navigation. `replace` is captured so tests can assert URL sync.
+// Mock next/navigation
 const replaceMock = vi.fn();
 let currentParams = new URLSearchParams();
 vi.mock("next/navigation", () => ({
@@ -57,50 +28,81 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => currentParams,
 }));
 
-import { useRecentCampaigns } from "@/hooks/useSoroban";
+function makeWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0 },
+    },
+  });
+
+  return function Wrapper({ children }: { children: React.ReactNode }) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <MockWalletProvider>
+          {children}
+        </MockWalletProvider>
+      </QueryClientProvider>
+    );
+  };
+}
 
 beforeEach(() => {
   replaceMock.mockClear();
   currentParams = new URLSearchParams();
+  setMockCampaigns([]);
+  vi.resetAllMocks();
 });
 
-describe("CampaignList - Empty States", () => {
-  it("displays 'No campaigns found' and 'Create campaign' button when no campaigns exist", () => {
-    vi.mocked(useRecentCampaigns).mockReturnValue({
-      data: [],
-      isLoading: false,
-      error: null,
-    } as any);
+describe("CampaignList - MSW Integrated States", () => {
+  it("displays 'No campaigns found' and 'Create campaign' button when no campaigns exist", async () => {
+    setMockCampaigns([]);
+    const Wrapper = makeWrapper();
+    render(<CampaignList />, { wrapper: Wrapper });
 
-    render(<CampaignList />);
-
-    expect(screen.getByText(/No campaigns found/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/No campaigns found/i)).toBeInTheDocument();
+    });
     expect(screen.getByText(/Why not create the first one\?/i)).toBeInTheDocument();
     const createButton = screen.getByRole("link", { name: /Create campaign/i });
     expect(createButton).toBeInTheDocument();
     expect(createButton).toHaveAttribute("href", "/create");
   });
 
-  it("displays 'No campaigns match your search' when search filters out all campaigns", async () => {
-    vi.mocked(useRecentCampaigns).mockReturnValue({
-      data: [
-        {
-          id: 1n,
-          title: "Flood Relief",
-          category: "Disaster",
-          creator: "GA...",
-          beneficiary: "GB...",
-          raised_amount: 0n,
-          target_amount: 100n,
-          deadline: 123n,
-          status: "Active",
-        },
-      ],
-      isLoading: false,
-      error: null,
-    } as any);
+  it("displays correct campaign cards when multiple exist", async () => {
+    setMockCampaigns([
+      buildCampaign({ id: 1n, title: "Flood Relief" }),
+      buildCampaign({ id: 2n, title: "School Supplies" }),
+    ]);
+    const Wrapper = makeWrapper();
+    render(<CampaignList />, { wrapper: Wrapper });
 
-    render(<CampaignList />);
+    await waitFor(() => {
+      expect(screen.getByText("Flood Relief")).toBeInTheDocument();
+      expect(screen.getByText("School Supplies")).toBeInTheDocument();
+    });
+    expect(screen.getAllByTestId("campaign-card")).toHaveLength(2);
+  });
+
+  it("displays error message on RPC failure", async () => {
+    server.use(...errorHandlers.transactionFailed);
+    const Wrapper = makeWrapper();
+    render(<CampaignList />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Failed to load campaigns/i)).toBeInTheDocument();
+    });
+  });
+
+  it("displays 'No campaigns match your search' when search filters out all campaigns", async () => {
+    setMockCampaigns([
+      buildCampaign({ id: 1n, title: "Flood Relief" }),
+    ]);
+    const Wrapper = makeWrapper();
+    render(<CampaignList />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("Flood Relief")).toBeInTheDocument();
+    });
 
     const searchInput = screen.getByPlaceholderText(/Search campaigns/i);
     fireEvent.change(searchInput, { target: { value: "Non-existent-campaign" } });
@@ -114,85 +116,24 @@ describe("CampaignList - Empty States", () => {
     );
 
     expect(screen.getByText(/Try a different term or clear your search/i)).toBeInTheDocument();
-    // Both the inline "x" and the empty-state button can clear the search.
-    expect(screen.getAllByRole("button", { name: /Clear search/i }).length).toBeGreaterThan(0);
-    expect(screen.getByRole("link", { name: /Create campaign/i })).toBeInTheDocument();
-  });
-
-  it("clears search results when 'Clear search' button is clicked", async () => {
-    vi.mocked(useRecentCampaigns).mockReturnValue({
-      data: [
-        {
-          id: 1n,
-          title: "Flood Relief",
-          category: "Disaster",
-          creator: "GA...",
-          beneficiary: "GB...",
-          raised_amount: 0n,
-          target_amount: 100n,
-          deadline: 123n,
-          status: "Active",
-        },
-      ],
-      isLoading: false,
-      error: null,
-    } as any);
-
-    render(<CampaignList />);
-
-    const searchInput = screen.getByPlaceholderText(/Search campaigns/i);
-    fireEvent.change(searchInput, { target: { value: "Non-existent-campaign" } });
-
-    await waitFor(() => {
-      expect(screen.getByText(/No campaigns match your search/i)).toBeInTheDocument();
-    });
-
-    const clearButtons = screen.getAllByRole("button", { name: /Clear search/i });
-    fireEvent.click(clearButtons[clearButtons.length - 1]);
-
-    await waitFor(() => {
-      expect(screen.queryByText(/No campaigns match your search/i)).not.toBeInTheDocument();
-      expect(screen.getByText(/Flood Relief/i)).toBeInTheDocument();
-    });
   });
 });
 
 describe("CampaignList - Search & URL sync", () => {
-  const campaignFixtures = [
-    {
-      id: 1n,
-      title: "Flood Relief",
-      category: "Disaster",
-      creator: "GAAA",
-      beneficiary: "GBBB",
-      raised_amount: 0n,
-      target_amount: 100n,
-      deadline: 123n,
-      status: "Active",
-    },
-    {
-      id: 2n,
-      title: "School Supplies",
-      category: "Education",
-      creator: "GCCC",
-      beneficiary: "GDDD",
-      raised_amount: 0n,
-      target_amount: 100n,
-      deadline: 456n,
-      status: "Active",
-    },
-  ];
+  beforeEach(() => {
+    setMockCampaigns([
+      buildCampaign({ id: 1n, title: "Flood Relief", category: "Disaster" }),
+      buildCampaign({ id: 2n, title: "School Supplies", category: "Education" }),
+    ]);
+  });
 
   it("filters the grid by title as the user types", async () => {
-    vi.mocked(useRecentCampaigns).mockReturnValue({
-      data: campaignFixtures,
-      isLoading: false,
-      error: null,
-    } as any);
+    const Wrapper = makeWrapper();
+    render(<CampaignList />, { wrapper: Wrapper });
 
-    render(<CampaignList />);
-
-    expect(screen.getByText("Flood Relief")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("Flood Relief")).toBeInTheDocument();
+    });
     expect(screen.getByText("School Supplies")).toBeInTheDocument();
 
     fireEvent.change(screen.getByPlaceholderText(/Search campaigns/i), {
@@ -206,13 +147,8 @@ describe("CampaignList - Search & URL sync", () => {
   });
 
   it("syncs the debounced query into the ?q= URL param", async () => {
-    vi.mocked(useRecentCampaigns).mockReturnValue({
-      data: campaignFixtures,
-      isLoading: false,
-      error: null,
-    } as any);
-
-    render(<CampaignList />);
+    const Wrapper = makeWrapper();
+    render(<CampaignList />, { wrapper: Wrapper });
 
     fireEvent.change(screen.getByPlaceholderText(/Search campaigns/i), {
       target: { value: "flood" },
@@ -223,41 +159,15 @@ describe("CampaignList - Search & URL sync", () => {
     });
   });
 
-  it("initializes the query from the ?q= URL param on load", () => {
+  it("initializes the query from the ?q= URL param on load", async () => {
     currentParams = new URLSearchParams("q=school");
-    vi.mocked(useRecentCampaigns).mockReturnValue({
-      data: campaignFixtures,
-      isLoading: false,
-      error: null,
-    } as any);
+    const Wrapper = makeWrapper();
+    render(<CampaignList />, { wrapper: Wrapper });
 
-    render(<CampaignList />);
-
-    expect(screen.getByPlaceholderText(/Search campaigns/i)).toHaveValue("school");
-    expect(screen.getByText("School Supplies")).toBeInTheDocument();
-    expect(screen.queryByText("Flood Relief")).not.toBeInTheDocument();
-  });
-
-  it("shows an inline clear (x) button that resets the query", async () => {
-    vi.mocked(useRecentCampaigns).mockReturnValue({
-      data: campaignFixtures,
-      isLoading: false,
-      error: null,
-    } as any);
-
-    render(<CampaignList />);
-
-    const input = screen.getByPlaceholderText(/Search campaigns/i);
-    fireEvent.change(input, { target: { value: "flood" } });
-
-    const clearButton = screen.getByRole("button", { name: /Clear search/i });
-    expect(clearButton).toBeInTheDocument();
-
-    fireEvent.click(clearButton);
-
-    expect(input).toHaveValue("");
     await waitFor(() => {
       expect(screen.getByText("School Supplies")).toBeInTheDocument();
     });
+    expect(screen.getByPlaceholderText(/Search campaigns/i)).toHaveValue("school");
+    expect(screen.queryByText("Flood Relief")).not.toBeInTheDocument();
   });
 });

@@ -1,27 +1,16 @@
 import { http, HttpResponse } from "msw";
-import { xdr, nativeToScVal, Address } from "@stellar/stellar-sdk";
+import { xdr, nativeToScVal } from "@stellar/stellar-sdk";
+import { buildCampaign, campaignToXdr, campaignArrayToXdr } from "../test/factories";
+import type { Campaign } from "@/lib/soroban";
 
-export function generateCampaignXdr() {
-  const entries = [
-    new xdr.ScMapEntry({ key: nativeToScVal("id", { type: "symbol" }), val: nativeToScVal(1n, { type: "u64" }) }),
-    new xdr.ScMapEntry({ key: nativeToScVal("creator", { type: "symbol" }), val: new Address("GBRPYHIL2CI3WHZDTOOQFC6EB4CGQOFN4L5MHZ5RWBNRUbalxas5F3B2").toScVal() }),
-    new xdr.ScMapEntry({ key: nativeToScVal("beneficiary", { type: "symbol" }), val: new Address("GBRPYHIL2CI3WHZDTOOQFC6EB4CGQOFN4L5MHZ5RWBNRUbalxas5F3B2").toScVal() }),
-    new xdr.ScMapEntry({ key: nativeToScVal("beneficiaries", { type: "symbol" }), val: xdr.ScVal.scvVec([]) }),
-    new xdr.ScMapEntry({ key: nativeToScVal("title", { type: "symbol" }), val: nativeToScVal("Test Campaign", { type: "string" }) }),
-    new xdr.ScMapEntry({ key: nativeToScVal("description", { type: "symbol" }), val: nativeToScVal("A test description", { type: "string" }) }),
-    new xdr.ScMapEntry({ key: nativeToScVal("category", { type: "symbol" }), val: nativeToScVal("medical", { type: "symbol" }) }),
-    new xdr.ScMapEntry({ key: nativeToScVal("target_amount", { type: "symbol" }), val: nativeToScVal(100n, { type: "i128" }) }),
-    new xdr.ScMapEntry({ key: nativeToScVal("raised_amount", { type: "symbol" }), val: nativeToScVal(0n, { type: "i128" }) }),
-    new xdr.ScMapEntry({ key: nativeToScVal("deadline", { type: "symbol" }), val: nativeToScVal(0n, { type: "u64" }) }),
-    new xdr.ScMapEntry({ key: nativeToScVal("accepted_token", { type: "symbol" }), val: new Address("CDLZS3ZCDY7SF3SIVR6Y7I6SN636O27T7G5MKSUIU22ZS76E55WJIPZ4").toScVal() }),
-    new xdr.ScMapEntry({ key: nativeToScVal("status", { type: "symbol" }), val: xdr.ScVal.scvMap([new xdr.ScMapEntry({ key: nativeToScVal("Active", { type: "symbol" }), val: xdr.ScVal.scvVoid() })]) }),
-  ];
-  return xdr.ScVal.scvMap(entries).toXDR("base64");
-}
+// Mutable store for mock campaigns so tests can override or add to them
+export let MOCK_CAMPAIGNS: Campaign[] = [
+  buildCampaign({ id: 1n, title: "First Campaign", raised_amount: 500n, target_amount: 1000n }),
+  buildCampaign({ id: 2n, title: "Second Campaign", category: "medical", status: "Inactive" }),
+];
 
-export function generateCampaignArrayXdr() {
-  const map = xdr.ScVal.fromXDR(generateCampaignXdr(), "base64");
-  return xdr.ScVal.scvVec([map]).toXDR("base64");
+export function setMockCampaigns(campaigns: Campaign[]) {
+  MOCK_CAMPAIGNS = campaigns;
 }
 
 export function generateUpdatesArrayXdr() {
@@ -46,9 +35,18 @@ export const handlers = [
           const funcName = op.hostFunction().invokeContract().functionName().toString();
           
           if (funcName === "get_campaign") {
-            xdrResult = generateCampaignXdr();
+            const args = op.hostFunction().invokeContract().args();
+            if (args.length > 0) {
+              const reqId = Number(args[0].u64().low);
+              const campaign = MOCK_CAMPAIGNS.find((c) => Number(c.id) === reqId);
+              if (campaign) {
+                xdrResult = campaignToXdr(campaign).toXDR("base64");
+              }
+            }
           } else if (funcName === "get_campaigns_paged") {
-            xdrResult = generateCampaignArrayXdr();
+            xdrResult = campaignArrayToXdr(MOCK_CAMPAIGNS).toXDR("base64");
+          } else if (funcName === "get_recent_campaigns") {
+            xdrResult = campaignArrayToXdr(MOCK_CAMPAIGNS.slice(0, 5)).toXDR("base64");
           } else if (funcName === "get_updates") {
             xdrResult = generateUpdatesArrayXdr();
           }
