@@ -43,7 +43,7 @@ export function useCampaignsPaged(limit: number) {
   });
 }
 
-import { toast } from "sonner";
+import { notify } from "@/lib/toast";
 
 /**
  * Funding milestones (percent of target) that trigger a celebratory toast.
@@ -133,32 +133,19 @@ export function useCreateCampaign() {
       return submitTransaction(address, "create_campaign", args);
     },
     onMutate: () => {
-      const toastId = toast.loading("Submitting transaction...");
+      const toastId = notify.loading();
       return { toastId };
     },
     onSuccess: (data: any, variables: any, context: any) => {
-      const action = data?.hash
-        ? {
-            label: "View Explorer",
-            onClick: () =>
-              window.open(`https://stellar.expert/explorer/testnet/tx/${data.hash}`, "_blank"),
-          }
-        : undefined;
-      const message = "Transaction confirmed";
-      if (context?.toastId) {
-        toast.success(message, { id: context.toastId, action });
-      } else {
-        toast.success(message, { action });
-      }
+      notify.success("Transaction confirmed", {
+        id: context?.toastId,
+        hash: data?.hash,
+      });
       queryClient.invalidateQueries({ queryKey: ["campaigns"] });
     },
     onError: (error: any, variables: any, context: any) => {
       const mappedError = mapTransactionError(error);
-      if (context?.toastId) {
-        toast.error(mappedError, { id: context.toastId });
-      } else {
-        toast.error(mappedError);
-      }
+      notify.error(mappedError, { id: context?.toastId });
     },
   });
 }
@@ -223,23 +210,14 @@ export function useDonate() {
         },
       );
 
-      const toastId = toast.loading("Submitting transaction...");
+      const toastId = notify.loading();
       return { previousCampaign, previousCampaignsQueries, toastId };
     },
     onSuccess: (data: any, variables: any, context: any) => {
-      const action = data?.hash
-        ? {
-            label: "View Explorer",
-            onClick: () =>
-              window.open(`https://stellar.expert/explorer/testnet/tx/${data.hash}`, "_blank"),
-          }
-        : undefined;
-      const message = "Transaction confirmed";
-      if (context?.toastId) {
-        toast.success(message, { id: context.toastId, action });
-      } else {
-        toast.success(message, { action });
-      }
+      notify.success("Transaction confirmed", {
+        id: context?.toastId,
+        hash: data?.hash,
+      });
     },
     onError: (error: any, variables: any, context: any) => {
       if (context?.previousCampaign) {
@@ -254,11 +232,7 @@ export function useDonate() {
         });
       }
       const mappedError = mapTransactionError(error);
-      if (context?.toastId) {
-        toast.error(mappedError, { id: context.toastId });
-      } else {
-        toast.error(mappedError);
-      }
+      notify.error(mappedError, { id: context?.toastId });
     },
     onSettled: (data: any, error: any, variables: any) => {
       queryClient.invalidateQueries({ queryKey: ["campaign", variables.campaignId.toString()] });
@@ -280,33 +254,20 @@ export function useClaimFunds() {
       return submitTransaction(address, "claim_funds", args);
     },
     onMutate: () => {
-      const toastId = toast.loading("Submitting transaction...");
+      const toastId = notify.loading();
       return { toastId };
     },
     onSuccess: (data: any, campaignId: any, context: any) => {
-      const action = data?.hash
-        ? {
-            label: "View Explorer",
-            onClick: () =>
-              window.open(`https://stellar.expert/explorer/testnet/tx/${data.hash}`, "_blank"),
-          }
-        : undefined;
-      const message = "Transaction confirmed";
-      if (context?.toastId) {
-        toast.success(message, { id: context.toastId, action });
-      } else {
-        toast.success(message, { action });
-      }
+      notify.success("Transaction confirmed", {
+        id: context?.toastId,
+        hash: data?.hash,
+      });
       queryClient.invalidateQueries({ queryKey: ["campaign", campaignId.toString()] });
       queryClient.invalidateQueries({ queryKey: ["campaigns"] });
     },
     onError: (error: any, variables: any, context: any) => {
       const mappedError = mapTransactionError(error);
-      if (context?.toastId) {
-        toast.error(mappedError, { id: context.toastId });
-      } else {
-        toast.error(mappedError);
-      }
+      notify.error(mappedError, { id: context?.toastId });
     },
   });
 }
@@ -324,32 +285,19 @@ export function useClaimRefund() {
       return submitTransaction(address, "claim_refund", args);
     },
     onMutate: () => {
-      const toastId = toast.loading("Claiming refund...");
+      const toastId = notify.loading("Claiming refund...");
       return { toastId };
     },
     onSuccess: (data: any, campaignId: any, context: any) => {
-      const action = data?.hash
-        ? {
-            label: "View Explorer",
-            onClick: () =>
-              window.open(`https://stellar.expert/explorer/testnet/tx/${data.hash}`, "_blank"),
-          }
-        : undefined;
-      const message = "Refund claimed successfully";
-      if (context?.toastId) {
-        toast.success(message, { id: context.toastId, action });
-      } else {
-        toast.success(message, { action });
-      }
+      notify.success("Refund claimed successfully", {
+        id: context?.toastId,
+        hash: data?.hash,
+      });
       queryClient.invalidateQueries({ queryKey: ["campaign", campaignId.toString()] });
       queryClient.invalidateQueries({ queryKey: ["refund-eligibility", campaignId.toString()] });
     },
     onError: (error: any, _variables: any, context: any) => {
-      if (context?.toastId) {
-        toast.error("Unable to claim refund. Please try again.", { id: context.toastId });
-      } else {
-        toast.error("Unable to claim refund. Please try again.");
-      }
+      notify.error("Unable to claim refund. Please try again.", { id: context?.toastId });
     },
   });
 }
@@ -490,33 +438,20 @@ export function useCancelCampaign() {
       return submitTransaction(address, "cancel_campaign", args);
     },
     onMutate: () => {
-      const toastId = toast.loading("Cancelling campaign...");
+      const toastId = notify.loading("Cancelling campaign...");
       return { toastId };
     },
     onSuccess: (data: any, campaignId: any, context: any) => {
-      const action = data?.hash
-        ? {
-            label: "View Explorer",
-            onClick: () =>
-              window.open(`https://stellar.expert/explorer/testnet/tx/${data.hash}`, "_blank"),
-          }
-        : undefined;
-      const message = "Campaign cancelled";
-      if (context?.toastId) {
-        toast.success(message, { id: context.toastId, action });
-      } else {
-        toast.success(message, { action });
-      }
+      notify.success("Campaign cancelled", {
+        id: context?.toastId,
+        hash: data?.hash,
+      });
       queryClient.invalidateQueries({ queryKey: ["campaign", campaignId.toString()] });
       queryClient.invalidateQueries({ queryKey: ["campaigns"] });
     },
     onError: (error: any, _variables: any, context: any) => {
       const mappedError = mapTransactionError(error);
-      if (context?.toastId) {
-        toast.error(mappedError, { id: context.toastId });
-      } else {
-        toast.error(mappedError);
-      }
+      notify.error(mappedError, { id: context?.toastId });
     },
   });
 }
@@ -537,34 +472,21 @@ export function useAddToWhitelist() {
       return submitTransaction(address, "add_to_whitelist", args);
     },
     onMutate: () => {
-      const toastId = toast.loading("Whitelisting address...");
+      const toastId = notify.loading("Whitelisting address...");
       return { toastId };
     },
     onSuccess: (data: any, variables: any, context: any) => {
-      const action = data?.hash
-        ? {
-            label: "View Explorer",
-            onClick: () =>
-              window.open(`https://stellar.expert/explorer/testnet/tx/${data.hash}`, "_blank"),
-          }
-        : undefined;
-      const message = "Address whitelisted";
-      if (context?.toastId) {
-        toast.success(message, { id: context.toastId, action });
-      } else {
-        toast.success(message, { action });
-      }
+      notify.success("Address whitelisted", {
+        id: context?.toastId,
+        hash: data?.hash,
+      });
       queryClient.invalidateQueries({
         queryKey: ["campaign", variables.campaignId.toString()],
       });
     },
     onError: (error: any, _variables: any, context: any) => {
       const mappedError = mapTransactionError(error);
-      if (context?.toastId) {
-        toast.error(mappedError, { id: context.toastId });
-      } else {
-        toast.error(mappedError);
-      }
+      notify.error(mappedError, { id: context?.toastId });
     },
   });
 }
