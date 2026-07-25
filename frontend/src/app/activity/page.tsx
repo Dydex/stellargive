@@ -6,7 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { AddressLink } from "@/components/AddressLink";
 import { useEvents } from "@/hooks/useSoroban";
-import { fromStroops } from "@/lib/soroban";
+import {
+  MISSING_FIELD,
+  formatEventAmount,
+  formatTxHash,
+  getCampaignId,
+  getEventField,
+} from "@/lib/eventData";
 import { RelativeTime } from "@/components/RelativeTime";
 import { Activity, ArrowUpRight, Loader2, Megaphone, Trophy } from "lucide-react";
 
@@ -30,12 +36,9 @@ function normalizeAddress(value: unknown): string | null {
   return str.length === 56 && str.startsWith("G") ? str : null;
 }
 
-function campaignId(value: unknown): string | null {
-  try {
-    return BigInt(value as any).toString();
-  } catch {
-    return null;
-  }
+/** A ledger sequence is metadata, not payload — still guard it for display. */
+function ledgerLabel(ledger: unknown): string {
+  return ledger === null || ledger === undefined || ledger === "" ? MISSING_FIELD : String(ledger);
 }
 
 export default function ActivityPage() {
@@ -45,10 +48,14 @@ export default function ActivityPage() {
   const [showIndicator, setShowIndicator] = useState(false);
 
   useEffect(() => {
-    if (fetchedEvents) {
+    if (Array.isArray(fetchedEvents)) {
       setEvents((prev) => {
         const existingIds = new Set(prev.map((e) => e.id));
-        const newEvents = fetchedEvents.filter((e: any) => !existingIds.has(e.id));
+        // Drop non-object entries up front so the render path only ever deals
+        // with (possibly incomplete) event objects.
+        const newEvents = fetchedEvents.filter(
+          (e: any) => e && typeof e === "object" && !existingIds.has(e.id),
+        );
         if (newEvents.length > 0) {
           if (prev.length > 0) {
             setShowIndicator(true);
@@ -129,8 +136,8 @@ export default function ActivityPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {visible.map((event: any) => (
-                      <ActivityRowDesktop key={event.id} event={event} />
+                    {visible.map((event: any, idx: number) => (
+                      <ActivityRowDesktop key={event?.id ?? `event-${idx}`} event={event} />
                     ))}
                   </tbody>
                 </table>
@@ -143,8 +150,8 @@ export default function ActivityPage() {
                   New activity
                 </div>
               )}
-              {visible.map((event: any) => (
-                <ActivityRowMobile key={event.id} event={event} />
+              {visible.map((event: any, idx: number) => (
+                <ActivityRowMobile key={event?.id ?? `event-${idx}`} event={event} />
               ))}
             </div>
           </>
@@ -155,26 +162,29 @@ export default function ActivityPage() {
 }
 
 function useActivityData(event: any) {
-  const id = campaignId(event.data?.[0]);
-  const when = event.createdAt ? (
-    <RelativeTime date={new Date(event.createdAt)} fallback={`Ledger ${event.ledger}`} />
-  ) : (
-    `Ledger ${event.ledger}`
-  );
+  const id = getCampaignId(event);
+  const ledger = ledgerLabel(event?.ledger);
+  const createdAt = event?.createdAt ? new Date(event.createdAt) : null;
+  const when =
+    createdAt && !Number.isNaN(createdAt.getTime()) ? (
+      <RelativeTime date={createdAt} fallback={`Ledger ${ledger}`} />
+    ) : (
+      `Ledger ${ledger}`
+    );
 
   let icon = <Megaphone className="w-4 h-4 text-blue-500" />;
   let iconBg = "bg-blue-500/10";
-  let label = event.topic;
+  let label = event?.topic ?? MISSING_FIELD;
   let body: React.ReactNode = null;
 
-  if (event.topic === "received") {
-    const donor = normalizeAddress(event.data?.[1]);
+  if (event?.topic === "received") {
+    const donor = normalizeAddress(getEventField(event, 1));
     icon = <ArrowUpRight className="w-4 h-4 text-green-500" />;
     iconBg = "bg-green-500/10";
     label = "Donated";
     body = (
       <>
-        <span className="font-bold">{fromStroops(event.data[2])} XLM</span> donated
+        <span className="font-bold">{formatEventAmount(event, 2)}</span> donated
         {donor ? (
           <>
             {" "}
@@ -189,22 +199,22 @@ function useActivityData(event: any) {
         {id && <> to Campaign #{id}</>}
       </>
     );
-  } else if (event.topic === "created") {
+  } else if (event?.topic === "created") {
     label = "Created";
     body = (
       <>
         New campaign{id && <> #{id}</>} created with a target of{" "}
-        <span className="font-bold">{fromStroops(event.data[3])} XLM</span>
+        <span className="font-bold">{formatEventAmount(event, 3)}</span>
       </>
     );
-  } else if (event.topic === "claimed") {
-    const beneficiary = normalizeAddress(event.data?.[1]);
+  } else if (event?.topic === "claimed") {
+    const beneficiary = normalizeAddress(getEventField(event, 1));
     icon = <Trophy className="w-4 h-4 text-purple-500" />;
     iconBg = "bg-purple-500/10";
     label = "Claimed";
     body = (
       <>
-        <span className="font-bold">{fromStroops(event.data[3])} XLM</span> claimed
+        <span className="font-bold">{formatEventAmount(event, 3)}</span> claimed
         {beneficiary ? (
           <>
             {" "}
@@ -217,14 +227,14 @@ function useActivityData(event: any) {
       </>
     );
   } else {
-    body = <span className="text-muted-foreground">{event.topic}</span>;
+    body = <span className="text-muted-foreground">{label}</span>;
   }
 
-  return { id, when, icon, iconBg, label, body, txHash: event.txHash };
+  return { id, when, ledger, icon, iconBg, label, body, txHash: event?.txHash, txLabel: formatTxHash(event?.txHash) };
 }
 
 function ActivityRowDesktop({ event }: { event: any }) {
-  const { icon, iconBg, label, body, when, txHash } = useActivityData(event);
+  const { icon, iconBg, label, body, when, ledger, txHash, txLabel } = useActivityData(event);
 
   return (
     <tr className="hover:bg-muted/10 transition-colors">
@@ -238,17 +248,17 @@ function ActivityRowDesktop({ event }: { event: any }) {
       </td>
       <td className="px-4 py-3 text-sm">{body}</td>
       <td className="px-4 py-3 text-xs text-muted-foreground">
-        {when} <span className="hidden lg:inline-block"> • Ledger {event.ledger}</span>
+        {when} <span className="hidden lg:inline-block"> • Ledger {ledger}</span>
       </td>
       <td className="px-4 py-3 text-right">
-        {txHash ? (
+        {txLabel ? (
           <a
             href={`https://stellar.expert/explorer/testnet/tx/${txHash}`}
             target="_blank"
             rel="noreferrer"
             className="font-mono text-xs text-primary hover:underline"
           >
-            {txHash.substring(0, 8)}...{txHash.substring(txHash.length - 4)}
+            {txLabel}
           </a>
         ) : (
           <span className="text-muted-foreground text-xs">N/A</span>
@@ -259,7 +269,7 @@ function ActivityRowDesktop({ event }: { event: any }) {
 }
 
 function ActivityRowMobile({ event }: { event: any }) {
-  const { icon, iconBg, label, body, when, txHash } = useActivityData(event);
+  const { icon, iconBg, label, body, when, txHash, txLabel } = useActivityData(event);
 
   return (
     <div className="flex flex-col gap-3 p-4 border rounded-lg bg-card">
@@ -276,14 +286,14 @@ function ActivityRowMobile({ event }: { event: any }) {
 
       <div className="pt-3 border-t flex justify-between items-center text-xs">
         <span className="text-muted-foreground">Tx Hash</span>
-        {txHash ? (
+        {txLabel ? (
           <a
             href={`https://stellar.expert/explorer/testnet/tx/${txHash}`}
             target="_blank"
             rel="noreferrer"
             className="font-mono text-primary hover:underline"
           >
-            {txHash.substring(0, 8)}...{txHash.substring(txHash.length - 4)}
+            {txLabel}
           </a>
         ) : (
           <span className="text-muted-foreground">N/A</span>
