@@ -8,6 +8,7 @@ const CreateCampaignForm = dynamic(
   { ssr: false },
 );
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { IconButton } from "@/components/ui/icon-button";
 import { Heart, Menu, X } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 
@@ -132,16 +133,16 @@ export function Navbar() {
         </div>
 
         {/* Mobile menu button */}
-        <button
+        <IconButton
           ref={menuButtonRef}
-          className="md:hidden p-2 rounded-md hover:bg-accent transition-colors"
+          className="md:hidden"
           onClick={() => setMobileMenuOpen(true)}
           aria-label="Open menu"
           aria-expanded={mobileMenuOpen}
           aria-controls="mobile-drawer"
         >
           <Menu size={24} />
-        </button>
+        </IconButton>
       </div>
 
       {/* Backdrop */}
@@ -166,13 +167,9 @@ export function Navbar() {
       >
         <div className="flex items-center justify-between p-4 border-b">
           <span className="text-lg font-semibold">Menu</span>
-          <button
-            onClick={closeMenu}
-            aria-label="Close menu"
-            className="p-2 rounded-md hover:bg-accent transition-colors"
-          >
+          <IconButton onClick={closeMenu} aria-label="Close menu">
             <X size={20} />
-          </button>
+          </IconButton>
         </div>
         <nav className="flex flex-col p-4 space-y-4" aria-label="Mobile navigation">
           <Link
