@@ -14,7 +14,11 @@ import {
   getEventField,
 } from "@/lib/eventData";
 import { RelativeTime } from "@/components/RelativeTime";
-import { Activity, ArrowUpRight, Loader2, Megaphone, Trophy } from "lucide-react";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import {
+  Activity, ArrowUpRight, Loader2, Megaphone, Trophy,
+  AlertTriangle, RotateCw,
+} from "lucide-react";
 
 const HISTORY_LIMIT = 50;
 const ZERO_ADDRESS = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
@@ -42,7 +46,7 @@ function ledgerLabel(ledger: unknown): string {
 }
 
 export default function ActivityPage() {
-  const { data: fetchedEvents, isLoading, isError } = useEvents(HISTORY_LIMIT);
+  const { data: fetchedEvents, isLoading, isError, refetch } = useEvents(HISTORY_LIMIT);
   const [filter, setFilter] = useState<FilterKey>("all");
   const [events, setEvents] = useState<any[]>([]);
   const [showIndicator, setShowIndicator] = useState(false);
@@ -111,14 +115,32 @@ export default function ActivityPage() {
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : isError && events.length === 0 ? (
-          <div className="text-center py-20 text-red-500">Unable to load on-chain events.</div>
+          <div
+            role="alert"
+            className="flex flex-col items-center justify-center gap-4 rounded-lg border border-destructive/30 bg-destructive/5 px-6 py-16 text-center"
+          >
+            <div className="rounded-full bg-destructive/10 p-3">
+              <AlertTriangle className="h-5 w-5 text-destructive" aria-hidden="true" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="font-semibold text-foreground">Unable to load activity</h3>
+              <p className="text-sm text-muted-foreground max-w-sm">
+                We couldn&apos;t fetch on-chain events right now. Check your connection and try
+                again.
+              </p>
+            </div>
+            <Button onClick={() => refetch()}>
+              <RotateCw className="mr-2 h-4 w-4" aria-hidden="true" />
+              Retry
+            </Button>
+          </div>
         ) : visible.length === 0 ? (
           <div className="text-center py-20 text-muted-foreground">
             No {filter === "all" ? "" : FILTERS.find((f) => f.key === filter)?.label.toLowerCase()}{" "}
             events found yet.
           </div>
         ) : (
-          <>
+          <ErrorBoundary heading="Activity feed">
             <div className="relative hidden md:block overflow-x-auto">
               {showIndicator && (
                 <div className="absolute -top-12 left-1/2 -translate-x-1/2 z-10 bg-primary text-primary-foreground px-4 py-1.5 rounded-full text-sm font-medium shadow-md animate-in fade-in slide-in-from-top-4 duration-300">
@@ -154,7 +176,7 @@ export default function ActivityPage() {
                 <ActivityRowMobile key={event?.id ?? `event-${idx}`} event={event} />
               ))}
             </div>
-          </>
+          </ErrorBoundary>
         )}
       </main>
     </div>

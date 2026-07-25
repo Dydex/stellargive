@@ -13,7 +13,8 @@ import { useCampaignSearch } from "@/hooks/useCampaignSearch";
 import { TokenSelector } from "@/components/TokenSelector";
 import { CategorySelector, CATEGORIES, type CategoryKey } from "@/components/CategorySelector";
 import { SortSelector, SORT_OPTIONS, type SortKey } from "@/components/SortSelector";
-import { Search, Compass, Loader2 } from "lucide-react";
+import { Search, Compass, Loader2, AlertTriangle, RotateCw } from "lucide-react";
+import { CampaignSkeletonGrid } from "@/components/CampaignSkeleton";
 import type { Campaign } from "@/lib/soroban";
 
 const PAGE_SIZE = 9;
@@ -66,7 +67,7 @@ function ExploreContent() {
   const [tokenFilter, setTokenFilter] = useState("");
 
   const sentinelRef = useRef<HTMLDivElement>(null);
-  const { data, isLoading, isFetching } = useCampaignsPaged(limit);
+  const { data, isLoading, isFetching, isError, refetch } = useCampaignsPaged(limit);
   const campaigns = data?.campaigns ?? EMPTY_CAMPAIGNS;
   const hasMore = data?.hasMore ?? false;
 
@@ -294,10 +295,25 @@ function ExploreContent() {
         )}
 
         {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {Array.from({ length: PAGE_SIZE }).map((_, i) => (
-              <div key={i} className="h-[300px] rounded-xl bg-muted animate-pulse" />
-            ))}
+          <CampaignSkeletonGrid count={PAGE_SIZE} />
+        ) : isError ? (
+          <div
+            role="alert"
+            className="flex flex-col items-center justify-center gap-4 rounded-lg border border-destructive/30 bg-destructive/5 px-6 py-16 text-center"
+          >
+            <div className="rounded-full bg-destructive/10 p-3">
+              <AlertTriangle className="h-5 w-5 text-destructive" aria-hidden="true" />
+            </div>
+            <div className="space-y-1">
+              <h2 className="font-semibold text-foreground">Unable to load campaigns</h2>
+              <p className="text-sm text-muted-foreground max-w-sm">
+                We couldn&apos;t reach the Stellar network. Check your connection and try again.
+              </p>
+            </div>
+            <Button onClick={() => refetch()}>
+              <RotateCw className="mr-2 h-4 w-4" aria-hidden="true" />
+              Retry
+            </Button>
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center gap-4 py-20 text-center">
@@ -348,13 +364,7 @@ function ExploreContent() {
 
         {/* Skeletons are appended only while the list is growing, so a
             background refresh never makes the page jump. */}
-        {isPaginating && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="h-[300px] rounded-xl bg-muted animate-pulse" />
-            ))}
-          </div>
-        )}
+        {isPaginating && <CampaignSkeletonGrid count={3} />}
 
         {/* Explicit fallback for the IntersectionObserver above: always available,
             including while a search term is narrowing the loaded results. */}

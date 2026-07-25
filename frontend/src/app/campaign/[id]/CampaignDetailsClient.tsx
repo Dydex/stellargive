@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useCampaign, useCancelCampaign, useEvents } from "@/hooks/useSoroban";
 import { useWallet } from "@/lib/WalletProvider";
 import { ShareButton } from "@/components/ShareButton";
@@ -15,9 +16,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Loader2, ImageIcon, Zap } from "lucide-react";
+import { Loader2, ImageIcon, Zap, AlertTriangle, RotateCw } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { formatBasisPoints } from "@/utils/format";
 import { calculateProgress, getCampaignImageUrl } from "@/lib/utils";
 import dynamic from "next/dynamic";
@@ -133,7 +135,7 @@ function CampaignTimeline({ campaign }: { campaign: any }) {
 export function CampaignDetailsClient({ params }: { params: { id: string } }) {
   const [imgError, setImgError] = useState(false);
   const { address, isWrongNetwork } = useWallet();
-  const { data: campaign, isLoading } = useCampaign(BigInt(params.id));
+  const { data: campaign, isLoading, isError, refetch } = useCampaign(BigInt(params.id));
   const cancelCampaign = useCancelCampaign();
   const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
   const [donateOpen, setDonateOpen] = useState(false);
@@ -146,6 +148,45 @@ export function CampaignDetailsClient({ params }: { params: { id: string } }) {
   // doesn't pop in abruptly and the layout doesn't shift when data arrives (#357).
   if (isLoading) {
     return <CampaignDetailSkeleton />;
+  }
+
+  // RPC failure: campaign data couldn't be fetched — show a friendly error with retry.
+  if (isError || !campaign) {
+    return (
+      <div className="p-8 max-w-4xl mx-auto">
+        <Breadcrumbs
+          items={[
+            { label: "Home", href: "/" },
+            { label: "Explore", href: "/explore" },
+            { label: `Campaign #${params.id}`, href: `/campaign/${params.id}` },
+          ]}
+        />
+        <div
+          role="alert"
+          className="mt-8 flex flex-col items-center justify-center gap-4 rounded-lg border border-destructive/30 bg-destructive/5 px-6 py-16 text-center"
+        >
+          <div className="rounded-full bg-destructive/10 p-3">
+            <AlertTriangle className="h-6 w-6 text-destructive" aria-hidden="true" />
+          </div>
+          <div className="space-y-1">
+            <h2 className="text-xl font-semibold">Unable to load campaign</h2>
+            <p className="text-sm text-muted-foreground max-w-sm">
+              We couldn&apos;t reach the Stellar network right now. Check your connection and try
+              again.
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <Button onClick={() => refetch()}>
+              <RotateCw className="mr-2 h-4 w-4" aria-hidden="true" />
+              Retry
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href="/explore">Browse campaigns</Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -303,11 +344,14 @@ export function CampaignDetailsClient({ params }: { params: { id: string } }) {
               </div>
             </div>
           )}
-          <ProjectUpdates campaignId={BigInt(params.id)} />
+          <ErrorBoundary heading="Project updates">
+            <ProjectUpdates campaignId={BigInt(params.id)} />
+          </ErrorBoundary>
         </div>
 
         <div className="lg:col-span-1">
-          <RecentDonations
+          <ErrorBoundary heading="Recent donations">
+              <RecentDonations
             campaignId={BigInt(params.id)}
             onDonateAgain={
               campaign?.status === "Active"
@@ -318,6 +362,7 @@ export function CampaignDetailsClient({ params }: { params: { id: string } }) {
                 : undefined
             }
           />
+          </ErrorBoundary>
         </div>
       </div>
 
