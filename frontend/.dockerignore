@@ -16,5 +16,9 @@ pnpm-debug.log*
 !.env.example
 
 Dockerfile*
+docker-compose*.yml
 
 README.md
+.github
+.vscode
+.idea
