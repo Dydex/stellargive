@@ -154,8 +154,38 @@ jobs:
           SENTRY_RELEASE: ${{ github.sha }}
         run: npm run build
 
+      - name: Verify Sentry source maps uploaded
+        id: verify-sourcemaps
+        working-directory: frontend
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+        run: |
+          if [ -z "$SENTRY_AUTH_TOKEN" ]; then
+            echo "SENTRY_AUTH_TOKEN is not set — skipping source map verification."
+            exit 0
+          fi
+
+          COUNT=$(npx sentry-cli releases files "${{ github.sha }}" list | grep -c '\.map' || true)
+          if [ "$COUNT" -eq 0 ]; then
+            echo "::error::No source map artifacts found for release ${{ github.sha }} — upload may have failed."
+            exit 1
+          fi
+          echo "✅ Found $COUNT source map artifact(s) uploaded for release ${{ github.sha }}."
+
+      - name: Confirm no source maps shipped in build output
+        working-directory: frontend
+        run: |
+          if find .next/static -name '*.map' | grep -q .; then
+            echo "::error::.map files found in .next/static — hideSourceMaps is not stripping them from the deployable output."
+            find .next/static -name '*.map'
+            exit 1
+          fi
+          echo "✅ No .map files present in .next/static (hideSourceMaps confirmed)."
+
       - name: Finalize Sentry release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.verify-sourcemaps.outcome == 'success'
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
