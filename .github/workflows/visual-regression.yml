@@ -38,10 +38,10 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium firefox webkit
 
       - name: Run visual regression tests
-        run: npx playwright test --project=desktop --project=mobile
+        run: npx playwright test --project=desktop --project=firefox --project=webkit --project=mobile --project=mobile-safari
         env:
           CI: true
 
