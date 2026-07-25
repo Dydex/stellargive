@@ -65,7 +65,10 @@ export default function ProfilePage() {
       const allEvents: any[] = Array.isArray(events) ? events : [];
       const myDonations = allEvents.filter(
         (e: any) =>
-          e && typeof e === "object" && e.topic === "received" && normalizeAddress(getEventField(e, 1)) === address,
+          e &&
+          typeof e === "object" &&
+          e.topic === "received" &&
+          normalizeAddress(getEventField(e, 1)) === address,
       );
       const supportedIds = new Set(
         myDonations.map((e: any) => getCampaignId(e) ?? "").filter(Boolean),

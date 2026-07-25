@@ -230,7 +230,17 @@ function useActivityData(event: any) {
     body = <span className="text-muted-foreground">{label}</span>;
   }
 
-  return { id, when, ledger, icon, iconBg, label, body, txHash: event?.txHash, txLabel: formatTxHash(event?.txHash) };
+  return {
+    id,
+    when,
+    ledger,
+    icon,
+    iconBg,
+    label,
+    body,
+    txHash: event?.txHash,
+    txLabel: formatTxHash(event?.txHash),
+  };
 }
 
 function ActivityRowDesktop({ event }: { event: any }) {
