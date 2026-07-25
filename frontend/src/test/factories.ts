@@ -1,18 +1,5 @@
 import type { Campaign, CampaignBeneficiary } from "@/lib/soroban";
-
-/**
- * Shared test factories for generating mock data in frontend unit/integration tests.
- * Use these to avoid duplicating fixture definitions across test files.
- *
- * Available Factories:
- * - `makeCampaign`: Generates a standard Campaign object. You can override specific fields.
- * - `makeEvent`: Generates a generic Soroban event.
- * - `makeDonationEvent`: Generates a specific 'received' donation event.
- *
- * Mock Usage:
- * Import these factories into your test files and call them to build consistent data objects.
- * Combine these with `errorHandlers` from `@/mocks/setup` to test specific failure cases cleanly.
- */
+import { xdr, Address, nativeToScVal } from "@stellar/stellar-sdk";
 
 export const WALLET_ADDRESS = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ";
 
@@ -58,3 +45,42 @@ export const makeDonationEvent = (
   ledger,
   txHash: "0000000000000000000000000000000000000000000000000000000000000000",
 });
+
+// Aliases for Issue #390 compliance
+export const buildCampaign = makeCampaign;
+export const buildEvent = makeEvent;
+export const buildDonation = makeDonationEvent;
+
+// XDR generation helpers for MSW simulateTransaction
+export function campaignToXdr(campaign: Campaign) {
+  const entries = [
+    new xdr.ScMapEntry({ key: nativeToScVal("id", { type: "symbol" }), val: nativeToScVal(campaign.id, { type: "u64" }) }),
+    new xdr.ScMapEntry({ key: nativeToScVal("creator", { type: "symbol" }), val: new Address(campaign.creator).toScVal() }),
+    new xdr.ScMapEntry({ key: nativeToScVal("beneficiary", { type: "symbol" }), val: new Address(campaign.beneficiary).toScVal() }),
+    new xdr.ScMapEntry({
+      key: nativeToScVal("beneficiaries", { type: "symbol" }),
+      val: xdr.ScVal.scvVec(
+        campaign.beneficiaries.map((b) =>
+          xdr.ScVal.scvMap([
+            new xdr.ScMapEntry({ key: nativeToScVal("address", { type: "symbol" }), val: new Address(b.address).toScVal() }),
+            new xdr.ScMapEntry({ key: nativeToScVal("share", { type: "symbol" }), val: nativeToScVal(b.share, { type: "u32" }) }),
+          ])
+        )
+      ),
+    }),
+    new xdr.ScMapEntry({ key: nativeToScVal("title", { type: "symbol" }), val: nativeToScVal(campaign.title, { type: "string" }) }),
+    new xdr.ScMapEntry({ key: nativeToScVal("description", { type: "symbol" }), val: nativeToScVal(campaign.description, { type: "string" }) }),
+    new xdr.ScMapEntry({ key: nativeToScVal("category", { type: "symbol" }), val: nativeToScVal(campaign.category, { type: "symbol" }) }),
+    new xdr.ScMapEntry({ key: nativeToScVal("target_amount", { type: "symbol" }), val: nativeToScVal(campaign.target_amount, { type: "i128" }) }),
+    new xdr.ScMapEntry({ key: nativeToScVal("raised_amount", { type: "symbol" }), val: nativeToScVal(campaign.raised_amount, { type: "i128" }) }),
+    new xdr.ScMapEntry({ key: nativeToScVal("deadline", { type: "symbol" }), val: nativeToScVal(campaign.deadline, { type: "u64" }) }),
+    new xdr.ScMapEntry({ key: nativeToScVal("accepted_token", { type: "symbol" }), val: new Address(campaign.accepted_token).toScVal() }),
+    new xdr.ScMapEntry({ key: nativeToScVal("status", { type: "symbol" }), val: xdr.ScVal.scvMap([new xdr.ScMapEntry({ key: nativeToScVal(campaign.status, { type: "symbol" }), val: xdr.ScVal.scvVoid() })]) }),
+  ];
+  return xdr.ScVal.scvMap(entries);
+}
+
+export function campaignArrayToXdr(campaigns: Campaign[]) {
+  const maps = campaigns.map((c) => campaignToXdr(c));
+  return xdr.ScVal.scvVec(maps);
+}
