@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { CampaignCard } from "@/components/CampaignCard";
 import { WalletConnect } from "@/components/WalletConnect";
+import { AsyncBoundary } from "@/components/AsyncBoundary";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -20,16 +21,7 @@ import {
 } from "@/lib/eventData";
 import { AddressLink } from "@/components/AddressLink";
 import { useWallet } from "@/lib/WalletProvider";
-import {
-  Loader2,
-  UserCircle,
-  Wallet,
-  HandCoins,
-  TrendingUp,
-  Megaphone,
-  AlertCircle,
-  RotateCw,
-} from "lucide-react";
+import { UserCircle, Wallet, HandCoins, TrendingUp, Megaphone } from "lucide-react";
 
 const ZERO_ADDRESS = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
 
@@ -136,120 +128,103 @@ export default function ProfilePage() {
           <p className="text-muted-foreground font-mono text-sm break-all">{address}</p>
         </div>
 
-        {/* Error state */}
-        {isError && !isLoading && (
-          <div className="rounded-lg border border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/30 p-6 space-y-4">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
-              <div className="space-y-2 flex-1">
-                <h3 className="font-semibold text-red-900 dark:text-red-200">
-                  Failed to load data
-                </h3>
-                <p className="text-sm text-red-800 dark:text-red-300">
-                  We encountered an error while fetching your campaigns. Please check your
-                  connection and try again.
-                </p>
+        <AsyncBoundary
+          isLoading={isLoading}
+          isError={isError}
+          onRetry={handleRetry}
+          errorMessage="We encountered an error while fetching your campaigns. Please check your connection and try again."
+          loadingSlot={
+            <div className="space-y-8">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <Skeleton className="h-24" />
+                <Skeleton className="h-24" />
+                <Skeleton className="h-24" />
               </div>
+              <CampaignsSectionSkeleton />
+              <CampaignsSectionSkeleton />
             </div>
-            <Button onClick={handleRetry} variant="outline" size="sm" className="w-full sm:w-auto">
-              <RotateCw className="mr-2 h-4 w-4" />
-              Retry
-            </Button>
+          }
+        >
+          {/* Summary cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <StatCard
+              icon={<TrendingUp className="h-4 w-4 text-blue-500" />}
+              label="Total Raised (created)"
+              value={`${fromStroops(totalRaised)} XLM`}
+            />
+            <StatCard
+              icon={<HandCoins className="h-4 w-4 text-green-500" />}
+              label="Total Donated"
+              value={`${fromStroops(totalDonated)} XLM`}
+            />
+            <StatCard
+              icon={<Megaphone className="h-4 w-4 text-purple-500" />}
+              label="Active Campaigns"
+              value={activeCount.toString()}
+            />
           </div>
-        )}
 
-        {/* Summary cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {isLoading ? (
-            <>
-              <Skeleton className="h-24" />
-              <Skeleton className="h-24" />
-              <Skeleton className="h-24" />
-            </>
-          ) : (
-            <>
-              <StatCard
-                icon={<TrendingUp className="h-4 w-4 text-blue-500" />}
-                label="Total Raised (created)"
-                value={`${fromStroops(totalRaised)} XLM`}
-              />
-              <StatCard
-                icon={<HandCoins className="h-4 w-4 text-green-500" />}
-                label="Total Donated"
-                value={`${fromStroops(totalDonated)} XLM`}
-              />
-              <StatCard
-                icon={<Megaphone className="h-4 w-4 text-purple-500" />}
-                label="Active Campaigns"
-                value={activeCount.toString()}
-              />
-            </>
-          )}
-        </div>
+          <div className="flex items-center gap-4 border-b border-border mt-8">
+            <button
+              onClick={() => setActiveTab("campaigns")}
+              className={`pb-3 text-sm font-medium transition-colors ${
+                activeTab === "campaigns"
+                  ? "border-b-2 border-primary text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              My Campaigns
+            </button>
+            <button
+              onClick={() => setActiveTab("donations")}
+              className={`pb-3 text-sm font-medium transition-colors ${
+                activeTab === "donations"
+                  ? "border-b-2 border-primary text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              My Donations
+            </button>
+          </div>
 
-        <div className="flex items-center gap-4 border-b border-border">
-          <button
-            onClick={() => setActiveTab("campaigns")}
-            className={`pb-3 text-sm font-medium transition-colors ${
-              activeTab === "campaigns"
-                ? "border-b-2 border-primary text-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            My Campaigns
-          </button>
-          <button
-            onClick={() => setActiveTab("donations")}
-            className={`pb-3 text-sm font-medium transition-colors ${
-              activeTab === "donations"
-                ? "border-b-2 border-primary text-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            My Donations
-          </button>
-        </div>
-
-        {isLoading ? (
-          <>
-            <CampaignsSectionSkeleton />
-            <CampaignsSectionSkeleton />
-          </>
-        ) : activeTab === "campaigns" ? (
-          <>
-            <Section
-              title="Campaigns I Created"
-              emptyText="You haven't created any campaigns yet."
-              campaigns={created}
-              action={
-                <Button asChild variant="outline" size="sm">
-                  <Link href="/create">Create your first campaign</Link>
-                </Button>
-              }
-            />
-            <Section
-              title="Campaigns I Supported"
-              emptyText="You haven't donated to any campaigns yet."
-              campaigns={supported}
-              action={
-                <Button asChild variant="outline" size="sm">
-                  <Link href="/explore">Explore campaigns</Link>
-                </Button>
-              }
-            />
-          </>
-        ) : (
-          <DonationsSection
-            donations={myDonationsEvents}
-            campaigns={campaigns ?? []}
-            emptyText="You haven't made any donations yet."
-            action={
-              <Button asChild variant="outline" size="sm">
-                <Link href="/explore">Explore campaigns</Link>
-              </Button>
-            }
-          />
-        )}
+          <div className="mt-8 space-y-8">
+            {activeTab === "campaigns" ? (
+              <>
+                <Section
+                  title="Campaigns I Created"
+                  emptyText="You haven't created any campaigns yet."
+                  campaigns={created}
+                  action={
+                    <Button asChild variant="outline" size="sm">
+                      <Link href="/create">Create your first campaign</Link>
+                    </Button>
+                  }
+                />
+                <Section
+                  title="Campaigns I Supported"
+                  emptyText="You haven't donated to any campaigns yet."
+                  campaigns={supported}
+                  action={
+                    <Button asChild variant="outline" size="sm">
+                      <Link href="/explore">Explore campaigns</Link>
+                    </Button>
+                  }
+                />
+              </>
+            ) : (
+              <DonationsSection
+                donations={myDonationsEvents}
+                campaigns={campaigns ?? []}
+                emptyText="You haven't made any donations yet."
+                action={
+                  <Button asChild variant="outline" size="sm">
+                    <Link href="/explore">Explore campaigns</Link>
+                  </Button>
+                }
+              />
+            )}
+          </div>
+        </AsyncBoundary>
       </main>
     </div>
   );
@@ -268,12 +243,17 @@ function DonationsSection({
 }) {
   return (
     <section className="space-y-4">
-      {donations.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 text-sm text-muted-foreground rounded-lg border border-dashed py-12 text-center">
-          <p>{emptyText}</p>
-          {action}
-        </div>
-      ) : (
+      <AsyncBoundary
+        isLoading={false}
+        isError={false}
+        isEmpty={donations.length === 0}
+        emptySlot={
+          <div className="flex flex-col items-center gap-3 text-sm text-muted-foreground rounded-lg border border-dashed py-12 text-center">
+            <p>{emptyText}</p>
+            {action}
+          </div>
+        }
+      >
         <div className="flex flex-col gap-4">
           {donations.map((event, idx) => {
             const campaignId = getCampaignId(event);
@@ -323,11 +303,10 @@ function DonationsSection({
             );
           })}
         </div>
-      )}
+      </AsyncBoundary>
     </section>
   );
 }
-
 
 function Section({
   title,
@@ -343,18 +322,23 @@ function Section({
   return (
     <section className="space-y-4">
       <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
-      {campaigns.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 text-sm text-muted-foreground rounded-lg border border-dashed py-12 text-center">
-          <p>{emptyText}</p>
-          {action}
-        </div>
-      ) : (
+      <AsyncBoundary
+        isLoading={false}
+        isError={false}
+        isEmpty={campaigns.length === 0}
+        emptySlot={
+          <div className="flex flex-col items-center gap-3 text-sm text-muted-foreground rounded-lg border border-dashed py-12 text-center">
+            <p>{emptyText}</p>
+            {action}
+          </div>
+        }
+      >
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {campaigns.map((c) => (
             <CampaignCard key={c.id.toString()} campaign={c} />
           ))}
         </div>
-      )}
+      </AsyncBoundary>
     </section>
   );
 }
