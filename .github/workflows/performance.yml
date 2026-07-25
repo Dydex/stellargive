@@ -1,0 +1,195 @@
+name: Performance
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "frontend/**"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bundle-analysis:
+    name: Bundle Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      # Build with ANALYZE=true to produce bundle-stats JSON files
+      - name: Build with bundle analyzer
+        working-directory: frontend
+        run: npm run build
+        env:
+          ANALYZE: "true"
+          NEXT_PUBLIC_USE_MOCK_WALLET: "true"
+          NEXT_PUBLIC_CONTRACT_ID: "CB6HVHRQYILGNKW7RBB66BC6TDBIEWADOA2YUUV4I22RXRLA6DY6OAKT"
+          NEXT_PUBLIC_SOROBAN_RPC_URL: "https://soroban-testnet.stellar.org"
+          NEXT_PUBLIC_NETWORK_PASSPHRASE: "Test SDF Network ; September 2015"
+          # Disable Sentry upload in performance CI to keep it fast
+          SENTRY_AUTH_TOKEN: ""
+
+      # Compute total JS size from .next/static/chunks and enforce 200 KB budget
+      - name: Enforce JS bundle size budget (200 KB)
+        working-directory: frontend
+        run: |
+          TOTAL=$(find .next/static/chunks -name '*.js' ! -name '*.map' \
+            -exec wc -c {} + 2>/dev/null | awk '/total/{print $1}' || echo 0)
+          echo "Total JS bundle size: $TOTAL bytes"
+          BUDGET=204800  # 200 KB in bytes
+          if [ "$TOTAL" -gt "$BUDGET" ]; then
+            echo "::error::JS bundle size ${TOTAL}B exceeds budget of ${BUDGET}B (200 KB)."
+            exit 1
+          fi
+          echo "✅ JS bundle size ${TOTAL}B is within the ${BUDGET}B budget."
+
+      # Persist bundle stats for trend tracking across runs
+      - name: Upload bundle stats artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundle-stats-${{ github.sha }}
+          path: |
+            frontend/.next/analyze/
+          retention-days: 30
+          if-no-files-found: warn
+
+      # Post bundle size summary as a PR comment
+      - name: Generate bundle size report
+        if: github.event_name == 'pull_request'
+        working-directory: frontend
+        id: bundle-report
+        run: |
+          TOTAL=$(find .next/static/chunks -name '*.js' ! -name '*.map' \
+            -exec wc -c {} + 2>/dev/null | awk '/total/{print $1}' || echo 0)
+          TOTAL_KB=$(echo "scale=1; $TOTAL / 1024" | bc)
+          echo "total_kb=$TOTAL_KB" >> "$GITHUB_OUTPUT"
+
+          # List top 10 largest chunks
+          TOP=$(find .next/static/chunks -name '*.js' ! -name '*.map' \
+            -exec wc -c {} + 2>/dev/null \
+            | sort -rn | head -10 \
+            | awk '{kb=int($1/1024); printf "| %-60s | %6d KB |\n", $2, kb}')
+
+          echo "top_chunks<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$TOP" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Post bundle size comment
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const totalKb = '${{ steps.bundle-report.outputs.total_kb }}';
+            const topChunks = `${{ steps.bundle-report.outputs.top_chunks }}`;
+            const budget = 200;
+            const status = parseFloat(totalKb) <= budget ? '✅' : '❌';
+            const body = [
+              `## ${status} Bundle Size Report`,
+              '',
+              `**Total JS size:** ${totalKb} KB (budget: ${budget} KB)`,
+              '',
+              '### Top 10 largest JS chunks',
+              '| Chunk | Size |',
+              '|-------|------|',
+              topChunks,
+              '',
+              `_Commit: ${{ github.sha }}_`,
+            ].join('\n');
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existing = comments.find(c =>
+              c.user.login === 'github-actions[bot]' &&
+              c.body.includes('Bundle Size Report')
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+  lighthouse:
+    name: Lighthouse CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build Next.js (standalone)
+        working-directory: frontend
+        run: npm run build
+        env:
+          NEXT_PUBLIC_USE_MOCK_WALLET: "true"
+          NEXT_PUBLIC_CONTRACT_ID: "CB6HVHRQYILGNKW7RBB66BC6TDBIEWADOA2YUUV4I22RXRLA6DY6OAKT"
+          NEXT_PUBLIC_SOROBAN_RPC_URL: "https://soroban-testnet.stellar.org"
+          NEXT_PUBLIC_NETWORK_PASSPHRASE: "Test SDF Network ; September 2015"
+          SENTRY_AUTH_TOKEN: ""
+
+      # Copy static assets into the standalone output so the server can serve them
+      - name: Prepare standalone output
+        working-directory: frontend
+        run: |
+          cp -r .next/static .next/standalone/.next/static
+          cp -r public .next/standalone/public 2>/dev/null || true
+
+      - name: Run Lighthouse CI
+        working-directory: frontend
+        run: npx --yes @lhci/cli@0.14.x autorun
+        env:
+          LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
+          PORT: 3000
+
+      - name: Upload Lighthouse results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-results-${{ github.sha }}
+          path: frontend/.lighthouseci/
+          retention-days: 30
