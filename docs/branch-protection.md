@@ -17,6 +17,31 @@ Every pull request targeted at the `main` branch must pass the following automat
 | `frontend` | `CI` | Runs frontend unit tests, accessibility audits (`test:a11y`), and builds the Next.js production bundle. |
 | `Cargo Audit` | `Dependency Audit` | Scans smart contract dependencies for known security vulnerabilities. |
 | `NPM Audit` | `Dependency Audit` | Scans frontend production dependencies for security advisories. |
+| `codecov/project` | `Codecov` | Project-level coverage status scoped by flag (rust, frontend). Informational until thresholds are validated, then promoted to blocking. |
+| `codecov/patch` | `Codecov` | Patch-level coverage status — new/changed lines must meet 80% coverage. Informational until thresholds are validated, then promoted to blocking. |
+
+---
+
+## Coverage Gating
+
+Coverage thresholds are configured in `codecov.yml` at the repository root.
+
+| Setting | Value | Purpose |
+|---|---|---|
+| `coverage.status.project.default.target` | `auto` | Fails if project coverage drops below previous commit. |
+| `coverage.status.project.default.threshold` | `0%` | No regression allowed. |
+| `coverage.status.patch.default.target` | `80%` | New/changed lines must have ≥80% coverage. |
+| `informational` | `true` (current) | Status checks report but do not block merges. |
+
+### Promotion to blocking
+
+Once thresholds are validated over several CI runs, remove `informational: true` from both project and patch status entries in `codecov.yml`. The `codecov/project` and `codecov/patch` checks will then become required status checks that block merges when coverage drops.
+
+To promote:
+
+1. Verify coverage reports are consistent across several PRs.
+2. Edit `codecov.yml` and set `informational: false` for both `project` and `patch` status entries.
+3. Add `codecov/project` and `codecov/patch` to the required status checks list below.
 
 ---
 
@@ -76,7 +101,9 @@ gh api \
       "rust-and-contract",
       "frontend",
       "Cargo Audit",
-      "NPM Audit"
+      "NPM Audit",
+      "codecov/project",
+      "codecov/patch"
     ]
   },
   "enforce_admins": false,

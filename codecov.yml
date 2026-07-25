@@ -1,0 +1,27 @@
+coverage:
+  status:
+    project:
+      default:
+        informational: true
+        target: auto
+        threshold: 0%
+    patch:
+      default:
+        informational: true
+        target: 80%
+
+flags:
+  rust:
+    paths:
+      - contracts/
+    carryforward: true
+  frontend:
+    paths:
+      - frontend/
+    carryforward: true
+
+ignore:
+  - "**/*.md"
+  - "**/node_modules/**"
+  - "frontend/.next/**"
+  - "target/**"
