@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Script to apply branch protection rules to the main branch.
 # Requires the GitHub CLI (gh) installed and authenticated.
+#
+# The "contexts" list below is the set of required status checks. It MUST stay in
+# sync with docs/required-status-checks.md — update both in the same change.
 
 set -euo pipefail
 

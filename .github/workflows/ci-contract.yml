@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  merge_group:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -18,7 +19,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      # On merge_group events, skip path filtering so the test job below always
+      # runs and reports its required status check to the merge queue.
       - name: Detect changes
+        if: github.event_name != 'merge_group'
         uses: dorny/paths-filter@v3
         id: filter
         with:
@@ -35,7 +39,7 @@ jobs:
 
   test:
     needs: change-detection
-    if: ${{ needs.change-detection.outputs.contracts == 'true' }}
+    if: ${{ github.event_name == 'merge_group' || needs.change-detection.outputs.contracts == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
