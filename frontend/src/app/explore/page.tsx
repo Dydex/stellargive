@@ -11,38 +11,13 @@ import { Input } from "@/components/ui/input";
 import { useCampaignsPaged } from "@/hooks/useSoroban";
 import { useCampaignSearch } from "@/hooks/useCampaignSearch";
 import { TokenSelector } from "@/components/TokenSelector";
+import { CategorySelector, CATEGORIES, type CategoryKey } from "@/components/CategorySelector";
+import { SortSelector, SORT_OPTIONS, type SortKey } from "@/components/SortSelector";
 import { Search, Compass, Loader2 } from "lucide-react";
 import type { Campaign } from "@/lib/soroban";
 
 const PAGE_SIZE = 9;
 
-type SortKey = "newest" | "ending-soon" | "near-goal" | "most-raised";
-
-// Tabs for time-based curation (highest conversion drivers)
-const TIME_TABS: { key: SortKey; label: string }[] = [
-  { key: "newest", label: "Newest" },
-  { key: "ending-soon", label: "Ending Soon" },
-];
-
-// Full sort options (including advanced sorts)
-const SORT_OPTIONS: { key: SortKey; label: string }[] = [
-  { key: "newest", label: "Newest" },
-  { key: "ending-soon", label: "Ending Soon" },
-  { key: "near-goal", label: "Near Goal" },
-  { key: "most-raised", label: "Most Raised" },
-];
-
-const CATEGORIES = [
-  "all",
-  "medical",
-  "food",
-  "shelter",
-  "education",
-  "relief",
-  "uncategorized",
-] as const;
-
-type CategoryKey = (typeof CATEGORIES)[number];
 
 function isCategoryKey(value: string | null): value is CategoryKey {
   return value !== null && (CATEGORIES as readonly string[]).includes(value);
@@ -234,7 +209,13 @@ function ExploreContent() {
               className="pl-9"
             />
           </div>
-          <div className="w-full sm:w-auto min-w-[220px]">
+          <div className="w-full sm:w-auto min-w-[160px]">
+            <CategorySelector
+              value={categoryFilter}
+              onChange={setCategoryFilter}
+            />
+          </div>
+          <div className="w-full sm:w-auto min-w-[160px]">
             <TokenSelector
               value={tokenFilter}
               onChange={setTokenFilter}
@@ -242,22 +223,15 @@ function ExploreContent() {
               allowCustom={false}
             />
           </div>
+          <div className="w-full sm:w-auto min-w-[160px]">
+            <SortSelector
+              value={sortBy}
+              onChange={setSortBy}
+            />
+          </div>
         </div>
 
-        {/* Time-based curation tabs */}
-        <div className="flex flex-wrap gap-2" role="tablist" aria-label="Campaign curation">
-          {TIME_TABS.map((tab) => (
-            <Button
-              key={tab.key}
-              variant={sortBy === tab.key ? "default" : "outline"}
-              onClick={() => setSortBy(tab.key)}
-              role="tab"
-              aria-selected={sortBy === tab.key}
-            >
-              {tab.label}
-            </Button>
-          ))}
-        </div>
+
 
         {/* Status filters */}
         <div
@@ -300,31 +274,7 @@ function ExploreContent() {
           </button>
         </div>
 
-        {/* Category filters */}
-        <div className="space-y-2">
-          <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            Filter by Category
-          </h2>
-          <div
-            className="flex flex-wrap gap-2"
-            role="tablist"
-            aria-label="Campaign category filters"
-          >
-            {CATEGORIES.map((cat) => (
-              <Button
-                key={cat}
-                variant={categoryFilter === cat ? "default" : "outline"}
-                size="sm"
-                onClick={() => setCategoryFilter(cat)}
-                role="tab"
-                aria-selected={categoryFilter === cat}
-                className="capitalize"
-              >
-                {cat === "uncategorized" ? "Uncategorized" : cat}
-              </Button>
-            ))}
-          </div>
-        </div>
+
 
         {!isLoading && (
           <p className="text-sm text-muted-foreground" role="status" aria-live="polite">
