@@ -72,8 +72,8 @@ export function CampaignCard({ campaign }: { campaign: Campaign }) {
           />
         ) : (
           <div className="flex flex-col items-center justify-center text-muted-foreground gap-2">
-            <ImageIcon className="w-8 h-8 opacity-20" />
-            <span className="text-[10px] uppercase tracking-widest opacity-40">No Image</span>
+            <ImageIcon className="w-8 h-8 opacity-40" />
+            <span className="text-[10px] uppercase tracking-widest">No Image</span>
           </div>
         )}
       </div>
