@@ -3,25 +3,12 @@
 import { useMemo, useState, useEffect } from "react";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { AddressLink } from "@/components/AddressLink";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useEvents } from "@/hooks/useSoroban";
-import {
-  MISSING_FIELD,
-  formatEventAmount,
-  formatTxHash,
-  getCampaignId,
-  getEventField,
-} from "@/lib/eventData";
-import { RelativeTime } from "@/components/RelativeTime";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
-import {
-  Activity, ArrowUpRight, Loader2, Megaphone, Trophy,
-  AlertTriangle, RotateCw,
-} from "lucide-react";
+import { Activity, Loader2, AlertTriangle, RotateCw } from "lucide-react";
+import dynamic from "next/dynamic";
 
 const HISTORY_LIMIT = 50;
-const ZERO_ADDRESS = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
 
 type FilterKey = "all" | "created" | "received" | "claimed";
 
@@ -32,17 +19,40 @@ const FILTERS: { key: FilterKey; label: string }[] = [
   { key: "claimed", label: "Claimed" },
 ];
 
-/** Returns a 56-char G-address or null (filtering the contract's zero placeholder). */
-function normalizeAddress(value: unknown): string | null {
-  if (!value) return null;
-  const str = value.toString();
-  if (str === ZERO_ADDRESS) return null;
-  return str.length === 56 && str.startsWith("G") ? str : null;
-}
+// ---------------------------------------------------------------------------
+// Code-split: the table + card renderers are the heaviest part of this route.
+// They pull in AddressLink, RelativeTime, ErrorBoundary, Card, and all the
+// lucide icons used only here. Splitting them shaves those modules from the
+// initial JS bundle; the fallback skeleton matches the table's min-height so
+// there is no layout shift.
+// ---------------------------------------------------------------------------
 
-/** A ledger sequence is metadata, not payload — still guard it for display. */
-function ledgerLabel(ledger: unknown): string {
-  return ledger === null || ledger === undefined || ledger === "" ? MISSING_FIELD : String(ledger);
+const ActivityFeed = dynamic(
+  () => import("./ActivityFeed").then((mod) => mod.ActivityFeed),
+  {
+    ssr: false,
+    loading: () => <ActivityFeedSkeleton />,
+  },
+);
+
+function ActivityFeedSkeleton() {
+  return (
+    <div className="space-y-3" aria-busy="true" aria-label="Loading activity feed">
+      {/* Desktop table skeleton — hidden on mobile to mirror the real layout */}
+      <div className="hidden md:block">
+        <Skeleton className="h-10 w-full rounded-t-lg" />
+        {Array.from({ length: 8 }).map((_, i) => (
+          <Skeleton key={i} className="h-14 w-full mt-px" />
+        ))}
+      </div>
+      {/* Mobile card skeleton */}
+      <div className="md:hidden space-y-3">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Skeleton key={i} className="h-28 w-full rounded-lg" />
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export default function ActivityPage() {
@@ -140,6 +150,7 @@ export default function ActivityPage() {
             events found yet.
           </div>
         ) : (
+          <ActivityFeed visible={visible} showIndicator={showIndicator} />
           <ErrorBoundary heading="Activity feed">
             <div className="relative hidden md:block overflow-x-auto">
               <div aria-live="polite" aria-atomic="true" className="absolute -top-12 left-1/2 -translate-x-1/2 z-10">
