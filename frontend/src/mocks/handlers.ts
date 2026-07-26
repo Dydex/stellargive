@@ -6,7 +6,7 @@ import type { Campaign } from "@/lib/soroban";
 // Mutable store for mock campaigns so tests can override or add to them
 export let MOCK_CAMPAIGNS: Campaign[] = [
   buildCampaign({ id: 1n, title: "First Campaign", raised_amount: 500n, target_amount: 1000n }),
-  buildCampaign({ id: 2n, title: "Second Campaign", category: "medical", status: "Inactive" }),
+  buildCampaign({ id: 2n, title: "Second Campaign", category: "medical", status: "Active" }),
 ];
 
 export function setMockCampaigns(campaigns: Campaign[]) {

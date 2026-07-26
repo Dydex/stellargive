@@ -173,7 +173,7 @@ export default function ProfilePage() {
                   </div>
                 </div>
                 <Button
-                  onClick={refetchCampaigns}
+                  onClick={() => refetchCampaigns()}
                   variant="outline"
                   size="sm"
                   className="w-full sm:w-auto"
@@ -197,7 +197,7 @@ export default function ProfilePage() {
                   </div>
                 </div>
                 <Button
-                  onClick={refetchEvents}
+                  onClick={() => refetchEvents()}
                   variant="outline"
                   size="sm"
                   className="w-full sm:w-auto"
