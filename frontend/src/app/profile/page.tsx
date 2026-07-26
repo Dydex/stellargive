@@ -22,7 +22,7 @@ import {
 import { AddressLink } from "@/components/AddressLink";
 import { useWallet } from "@/lib/WalletProvider";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { UserCircle, Wallet, HandCoins, TrendingUp, Megaphone } from "lucide-react";
+import { AlertCircle, RotateCw, UserCircle, Wallet, HandCoins, TrendingUp, Megaphone } from "lucide-react";
 
 const ZERO_ADDRESS = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
 
@@ -108,13 +108,8 @@ export default function ProfilePage() {
     );
   }
 
-  const isLoading = campaignsLoading || eventsLoading;
-  const isError = campaignsError || eventsError;
-
-  const handleRetry = () => {
-    refetchCampaigns();
-    refetchEvents();
-  };
+  const bothLoading = campaignsLoading && eventsLoading;
+  const bothError = campaignsError && eventsError;
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -128,85 +123,154 @@ export default function ProfilePage() {
           <p className="text-muted-foreground font-mono text-sm break-all">{address}</p>
         </div>
 
-        <AsyncBoundary
-          isLoading={isLoading}
-          isError={isError}
-          onRetry={handleRetry}
-          errorMessage="We encountered an error while fetching your campaigns. Please check your connection and try again."
-          loadingSlot={
-            <div className="space-y-8">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <Skeleton className="h-24" />
-                <Skeleton className="h-24" />
-                <Skeleton className="h-24" />
-              </div>
-              <CampaignsSectionSkeleton />
-              <CampaignsSectionSkeleton />
+        {bothLoading ? (
+          <div className="space-y-8">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Skeleton className="h-24" />
+              <Skeleton className="h-24" />
+              <Skeleton className="h-24" />
             </div>
-          }
-        >
-          {/* Summary cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <StatCard
-              icon={<TrendingUp className="h-4 w-4 text-blue-500" />}
-              label="Total Raised (created)"
-              value={`${fromStroops(totalRaised)} XLM`}
-            />
-            <StatCard
-              icon={<HandCoins className="h-4 w-4 text-green-500" />}
-              label="Total Donated"
-              value={`${fromStroops(totalDonated)} XLM`}
-            />
-            <StatCard
-              icon={<Megaphone className="h-4 w-4 text-purple-500" />}
-              label="Active Campaigns"
-              value={activeCount.toString()}
-            />
+            <CampaignsSectionSkeleton />
+            <CampaignsSectionSkeleton />
           </div>
+        ) : bothError ? (
+          <div className="rounded-lg border border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/30 p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+              <div className="space-y-2 flex-1">
+                <h3 className="font-semibold text-red-900 dark:text-red-200">Failed to load data</h3>
+                <p className="text-sm text-red-800 dark:text-red-300">
+                  We encountered an error while fetching your campaigns. Please check your connection and try again.
+                </p>
+              </div>
+            </div>
+            <Button
+              onClick={() => {
+                refetchCampaigns();
+                refetchEvents();
+              }}
+              variant="outline"
+              size="sm"
+              className="w-full sm:w-auto"
+            >
+              <RotateCw className="mr-2 h-4 w-4" />
+              Retry
+            </Button>
+          </div>
+        ) : (
+          <>
+            {campaignsError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/30 p-4 space-y-3">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+                  <div className="space-y-1 flex-1">
+                    <h3 className="font-semibold text-sm text-red-900 dark:text-red-200">
+                      Failed to load campaigns
+                    </h3>
+                    <p className="text-xs text-red-800 dark:text-red-300">
+                      Campaign data is unavailable right now. Other sections may still work.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  onClick={refetchCampaigns}
+                  variant="outline"
+                  size="sm"
+                  className="w-full sm:w-auto"
+                >
+                  <RotateCw className="mr-2 h-4 w-4" />
+                  Retry Campaigns
+                </Button>
+              </div>
+            )}
+            {eventsError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/30 p-4 space-y-3">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+                  <div className="space-y-1 flex-1">
+                    <h3 className="font-semibold text-sm text-red-900 dark:text-red-200">
+                      Failed to load donation history
+                    </h3>
+                    <p className="text-xs text-red-800 dark:text-red-300">
+                      Donation data is unavailable right now. Other sections may still work.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  onClick={refetchEvents}
+                  variant="outline"
+                  size="sm"
+                  className="w-full sm:w-auto"
+                >
+                  <RotateCw className="mr-2 h-4 w-4" />
+                  Retry Donations
+                </Button>
+              </div>
+            )}
 
-          <Tabs defaultValue="campaigns" className="mt-8">
-            <TabsList aria-label="Profile sections">
-              <TabsTrigger value="campaigns">My Campaigns</TabsTrigger>
-              <TabsTrigger value="donations">My Donations</TabsTrigger>
-            </TabsList>
+            {/* Summary cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <StatCard
+                icon={<TrendingUp className="h-4 w-4 text-blue-500" />}
+                label="Total Raised (created)"
+                value={`${fromStroops(totalRaised)} XLM`}
+              />
+              <StatCard
+                icon={<HandCoins className="h-4 w-4 text-green-500" />}
+                label="Total Donated"
+                value={`${fromStroops(totalDonated)} XLM`}
+              />
+              <StatCard
+                icon={<Megaphone className="h-4 w-4 text-purple-500" />}
+                label="Active Campaigns"
+                value={activeCount.toString()}
+              />
+            </div>
 
-            <TabsContent value="campaigns" className="mt-8 space-y-8">
-              <Section
-                title="Campaigns I Created"
-                emptyText="You haven't created any campaigns yet."
-                campaigns={created}
-                action={
-                  <Button asChild variant="outline" size="sm">
-                    <Link href="/create">Create your first campaign</Link>
-                  </Button>
-                }
-              />
-              <Section
-                title="Campaigns I Supported"
-                emptyText="You haven't donated to any campaigns yet."
-                campaigns={supported}
-                action={
-                  <Button asChild variant="outline" size="sm">
-                    <Link href="/explore">Explore campaigns</Link>
-                  </Button>
-                }
-              />
-            </TabsContent>
+            <Tabs defaultValue="campaigns" className="mt-8">
+              <TabsList aria-label="Profile sections">
+                <TabsTrigger value="campaigns">My Campaigns</TabsTrigger>
+                <TabsTrigger value="donations">My Donations</TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="donations" className="mt-8">
-              <DonationsSection
-                donations={myDonationsEvents}
-                campaigns={campaigns ?? []}
-                emptyText="You haven't made any donations yet."
-                action={
-                  <Button asChild variant="outline" size="sm">
-                    <Link href="/explore">Explore campaigns</Link>
-                  </Button>
-                }
-              />
-            </TabsContent>
-          </Tabs>
-        </AsyncBoundary>
+              <TabsContent value="campaigns" className="mt-8 space-y-8">
+                <Section
+                  title="Campaigns I Created"
+                  emptyText="You haven't created any campaigns yet."
+                  campaigns={created}
+                  action={
+                    <Button asChild variant="outline" size="sm">
+                      <Link href="/create">Create your first campaign</Link>
+                    </Button>
+                  }
+                />
+                <Section
+                  title="Campaigns I Supported"
+                  emptyText="You haven't donated to any campaigns yet."
+                  campaigns={supported}
+                  action={
+                    <Button asChild variant="outline" size="sm">
+                      <Link href="/explore">Explore campaigns</Link>
+                    </Button>
+                  }
+                />
+              </TabsContent>
+
+              <TabsContent value="donations" className="mt-8">
+                <DonationsSection
+                  donations={myDonationsEvents}
+                  campaigns={campaigns ?? []}
+                  emptyText="You haven't made any donations yet."
+                  action={
+                    <Button asChild variant="outline" size="sm">
+                      <Link href="/explore">Explore campaigns</Link>
+                    </Button>
+                  }
+                />
+              </TabsContent>
+            </Tabs>
+          </>
+        )}
       </main>
     </div>
   );
