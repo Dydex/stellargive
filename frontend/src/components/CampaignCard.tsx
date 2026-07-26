@@ -9,6 +9,7 @@ import { useTokenMetadata } from "@/hooks/useSoroban";
 import { calculateProgress, getCampaignImageUrl, CAMPAIGN_IMAGE_BLUR_DATA_URL } from "@/lib/utils";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress, type ProgressVariant } from "@/components/ui/progress";
+import Link from "next/link";
 import dynamic from "next/dynamic";
 const DonateModal = dynamic(
   () => import("@/components/DonateModal").then((mod) => mod.DonateModal),
@@ -71,8 +72,8 @@ export function CampaignCard({ campaign }: { campaign: Campaign }) {
           />
         ) : (
           <div className="flex flex-col items-center justify-center text-muted-foreground gap-2">
-            <ImageIcon className="w-8 h-8 opacity-20" />
-            <span className="text-[10px] uppercase tracking-widest opacity-40">No Image</span>
+            <ImageIcon className="w-8 h-8 opacity-40" />
+            <span className="text-[10px] uppercase tracking-widest">No Image</span>
           </div>
         )}
       </div>
@@ -85,8 +86,13 @@ export function CampaignCard({ campaign }: { campaign: Campaign }) {
               : "Uncategorized"}
           </Badge>
         </div>
-        <CardTitle className="line-clamp-1 group-hover:text-primary transition-colors">
-          {campaign.title}
+        <CardTitle className="line-clamp-1 transition-colors">
+          <Link 
+            href={`/campaign/${campaign.id.toString()}`} 
+            className="hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-sm p-1 -m-1"
+          >
+            {campaign.title}
+          </Link>
         </CardTitle>
       </CardHeader>
       <CardContent className="flex-1 space-y-4">
@@ -139,7 +145,7 @@ export function CampaignCard({ campaign }: { campaign: Campaign }) {
           </div>
           <button
             onClick={() => setDonateOpen(true)}
-            className="shrink-0 rounded-md bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600"
+            className="shrink-0 rounded-md bg-emerald-600 px-3 py-2 min-h-[44px] text-xs font-semibold text-white transition-colors hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 dark:bg-emerald-500 dark:hover:bg-emerald-600 dark:focus-visible:ring-emerald-400 dark:focus-visible:ring-offset-emerald-900"
             aria-label={`Quick donate to fund the remaining ${gap.toFixed(2)} XLM`}
           >
             Donate
