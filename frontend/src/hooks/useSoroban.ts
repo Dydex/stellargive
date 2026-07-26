@@ -25,6 +25,9 @@ export function useCampaign(id: bigint) {
   return useQuery({
     queryKey: ["campaign", id.toString()],
     queryFn: () => getCampaign(id),
+    // Individual campaign pages are the LCP content; serve from cache for up
+    // to 30 s before considering a background refetch.
+    staleTime: 30_000,
   });
 }
 
@@ -32,6 +35,9 @@ export function useRecentCampaigns() {
   return useQuery({
     queryKey: ["campaigns", "recent"],
     queryFn: () => getRecentCampaigns(),
+    // Profile page remounts on wallet changes — 30 s staleTime prevents
+    // back-to-back refetches when the wallet context re-renders.
+    staleTime: 30_000,
   });
 }
 
@@ -40,6 +46,10 @@ export function useCampaignsPaged(limit: number) {
     queryKey: ["campaigns", "paged", limit],
     queryFn: () => getCampaignsPage(limit),
     placeholderData: (prev) => prev,
+    // Explore page mounts/unmounts on navigation; 30 s staleTime means
+    // paginated results are served instantly on back-navigation without a
+    // redundant network call.
+    staleTime: 30_000,
   });
 }
 
