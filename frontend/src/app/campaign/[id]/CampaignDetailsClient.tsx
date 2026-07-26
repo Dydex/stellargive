@@ -21,7 +21,7 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { formatBasisPoints } from "@/utils/format";
-import { calculateProgress, getCampaignImageUrl } from "@/lib/utils";
+import { calculateProgress, getCampaignImageUrl, CAMPAIGN_IMAGE_BLUR_DATA_URL } from "@/lib/utils";
 import dynamic from "next/dynamic";
 const RecentDonations = dynamic(
   () => import("@/components/RecentDonations").then((mod) => mod.RecentDonations),
@@ -277,10 +277,10 @@ export function CampaignDetailsClient({ params }: { params: { id: string } }) {
                     src={getCampaignImageUrl(campaign.metadata_uri)!}
                     alt={campaign.title}
                     fill
-                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 800px"
-                    loading="lazy"
+                    sizes="(max-width: 768px) 100vw, (max-width: 1024px) 66vw, 800px"
+                    priority
                     placeholder="blur"
-                    blurDataURL="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNzAwIiBoZWlnaHQ9IjQ3NSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNzAwIiBoZWlnaHQ9IjQ3NSIgZmlsbD0iI2UwZTBlMCIvPjwvc3ZnPg=="
+                    blurDataURL={CAMPAIGN_IMAGE_BLUR_DATA_URL}
                     className="object-cover"
                     onError={() => setImgError(true)}
                   />

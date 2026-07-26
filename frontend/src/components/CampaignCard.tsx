@@ -6,7 +6,7 @@ import Image from "next/image";
 import { Campaign } from "@/lib/soroban";
 import { formatTokenAmount } from "@/utils/format";
 import { useTokenMetadata } from "@/hooks/useSoroban";
-import { calculateProgress, getCampaignImageUrl } from "@/lib/utils";
+import { calculateProgress, getCampaignImageUrl, CAMPAIGN_IMAGE_BLUR_DATA_URL } from "@/lib/utils";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress, type ProgressVariant } from "@/components/ui/progress";
 import dynamic from "next/dynamic";
@@ -65,7 +65,7 @@ export function CampaignCard({ campaign }: { campaign: Campaign }) {
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             loading="lazy"
             placeholder="blur"
-            blurDataURL="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNzAwIiBoZWlnaHQ9IjQ3NSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNzAwIiBoZWlnaHQ9IjQ3NSIgZmlsbD0iI2UwZTBlMCIvPjwvc3ZnPg=="
+            blurDataURL={CAMPAIGN_IMAGE_BLUR_DATA_URL}
             className="object-cover transition-transform duration-500 group-hover:scale-105"
             onError={() => setImgError(true)}
           />
