@@ -19,7 +19,6 @@ import type { Campaign } from "@/lib/soroban";
 
 const PAGE_SIZE = 9;
 
-
 function isCategoryKey(value: string | null): value is CategoryKey {
   return value !== null && (CATEGORIES as readonly string[]).includes(value);
 }
@@ -56,6 +55,15 @@ function sortCampaigns(campaigns: Campaign[], sortBy: SortKey): Campaign[] {
 
 const EMPTY_CAMPAIGNS: Campaign[] = [];
 
+/** Stable IDs used to wire tabs → tabpanel with aria-controls/aria-labelledby */
+const STATUS_TABS = [
+  { value: "all", label: "All", id: "status-tab-all", badgeStatus: "All" as const },
+  { value: "active", label: "Active", id: "status-tab-active", badgeStatus: "Active" as const },
+  { value: "funded", label: "Funded", id: "status-tab-funded", badgeStatus: "Funded" as const },
+] as const;
+
+const RESULTS_PANEL_ID = "campaign-results-panel";
+
 function ExploreContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -65,6 +73,32 @@ function ExploreContent() {
   const [categoryFilter, setCategoryFilter] = useState<CategoryKey>("all");
   const [sortBy, setSortBy] = useState<SortKey>("newest");
   const [tokenFilter, setTokenFilter] = useState("");
+
+  /** Roving tabIndex refs — one entry per STATUS_TABS item */
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([null, null, null]);
+
+  /** Arrow-key roving focus within the tablist */
+  const handleTabKeyDown = (e: React.KeyboardEvent, currentIndex: number) => {
+    const count = STATUS_TABS.length;
+    let next = -1;
+    if (e.key === "ArrowRight") {
+      e.preventDefault();
+      next = (currentIndex + 1) % count;
+    } else if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      next = (currentIndex - 1 + count) % count;
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      next = 0;
+    } else if (e.key === "End") {
+      e.preventDefault();
+      next = count - 1;
+    }
+    if (next !== -1) {
+      tabRefs.current[next]?.focus();
+      setStatusFilter(STATUS_TABS[next].value);
+    }
+  };
 
   const sentinelRef = useRef<HTMLDivElement>(null);
   const { data, isLoading, isFetching, isError, refetch } = useCampaignsPaged(limit);
@@ -222,10 +256,7 @@ function ExploreContent() {
             />
           </div>
           <div className="w-full sm:w-auto min-w-[160px]">
-            <CategorySelector
-              value={categoryFilter}
-              onChange={setCategoryFilter}
-            />
+            <CategorySelector value={categoryFilter} onChange={setCategoryFilter} />
           </div>
           <div className="w-full sm:w-auto min-w-[160px]">
             <TokenSelector
@@ -236,154 +267,152 @@ function ExploreContent() {
             />
           </div>
           <div className="w-full sm:w-auto min-w-[160px]">
-            <SortSelector
-              value={sortBy}
-              onChange={setSortBy}
-            />
+            <SortSelector value={sortBy} onChange={setSortBy} />
           </div>
         </div>
 
-
-
-        {/* Status filters */}
+        {/* Status filters — proper ARIA tab pattern with roving tabIndex */}
         <div
-          className="flex flex-wrap gap-2 items-center"
           role="tablist"
           aria-label="Campaign status filters"
+          className="flex flex-wrap gap-2 items-center"
         >
-          <button
-            onClick={() => setStatusFilter("all")}
-            role="tab"
-            aria-selected={statusFilter === "all"}
-            className="focus:outline-none"
-          >
-            <CampaignStatusBadge
-              status="All"
-              className={`text-sm px-4 py-1.5 transition-opacity ${statusFilter === "all" ? "ring-2 ring-primary ring-offset-2 opacity-100" : "opacity-60 hover:opacity-100"}`}
-            />
-          </button>
-          <button
-            onClick={() => setStatusFilter("active")}
-            role="tab"
-            aria-selected={statusFilter === "active"}
-            className="focus:outline-none"
-          >
-            <CampaignStatusBadge
-              status="Active"
-              className={`text-sm px-4 py-1.5 transition-opacity ${statusFilter === "active" ? "ring-2 ring-primary ring-offset-2 opacity-100" : "opacity-60 hover:opacity-100"}`}
-            />
-          </button>
-          <button
-            onClick={() => setStatusFilter("funded")}
-            role="tab"
-            aria-selected={statusFilter === "funded"}
-            className="focus:outline-none"
-          >
-            <CampaignStatusBadge
-              status="Funded"
-              className={`text-sm px-4 py-1.5 transition-opacity ${statusFilter === "funded" ? "ring-2 ring-primary ring-offset-2 opacity-100" : "opacity-60 hover:opacity-100"}`}
-            />
-          </button>
+          {STATUS_TABS.map((tab, i) => {
+            const isSelected = statusFilter === tab.value;
+            return (
+              <button
+                key={tab.value}
+                id={tab.id}
+                ref={(el) => {
+                  tabRefs.current[i] = el;
+                }}
+                role="tab"
+                aria-selected={isSelected}
+                aria-controls={RESULTS_PANEL_ID}
+                tabIndex={isSelected ? 0 : -1}
+                onClick={() => setStatusFilter(tab.value)}
+                onKeyDown={(e) => handleTabKeyDown(e, i)}
+                className="focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded"
+              >
+                <CampaignStatusBadge
+                  status={tab.badgeStatus}
+                  className={`text-sm px-4 py-1.5 transition-opacity ${
+                    isSelected
+                      ? "ring-2 ring-primary ring-offset-2 opacity-100"
+                      : "opacity-60 hover:opacity-100"
+                  }`}
+                />
+              </button>
+            );
+          })}
         </div>
 
+        {/* Results panel — wired to the tablist above via id/role/aria-labelledby */}
+        <div
+          id={RESULTS_PANEL_ID}
+          role="tabpanel"
+          aria-labelledby={STATUS_TABS.find((t) => t.value === statusFilter)?.id}
+          aria-live="polite"
+          className="space-y-6"
+          tabIndex={0}
+        >
+          {!isLoading && (
+            <p className="text-sm text-muted-foreground" role="status">
+              {countLabel}
+            </p>
+          )}
 
-
-        {!isLoading && (
-          <p className="text-sm text-muted-foreground" role="status" aria-live="polite">
-            {countLabel}
-          </p>
-        )}
-
-        {isLoading ? (
-          <CampaignSkeletonGrid count={PAGE_SIZE} />
-        ) : isError ? (
-          <div
-            role="alert"
-            className="flex flex-col items-center justify-center gap-4 rounded-lg border border-destructive/30 bg-destructive/5 px-6 py-16 text-center"
-          >
-            <div className="rounded-full bg-destructive/10 p-3">
-              <AlertTriangle className="h-5 w-5 text-destructive" aria-hidden="true" />
-            </div>
-            <div className="space-y-1">
-              <h2 className="font-semibold text-foreground">Unable to load campaigns</h2>
-              <p className="text-sm text-muted-foreground max-w-sm">
-                We couldn&apos;t reach the Stellar network. Check your connection and try again.
-              </p>
-            </div>
-            <Button onClick={() => refetch()}>
-              <RotateCw className="mr-2 h-4 w-4" aria-hidden="true" />
-              Retry
-            </Button>
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center gap-4 py-20 text-center">
-            <div>
-              <p className="font-medium text-foreground">No campaigns found</p>
-              <p className="text-muted-foreground">{emptyMessage}</p>
-            </div>
-            {debouncedSearch ? (
-              <Button variant="outline" onClick={() => setSearchTerm("")}>
-                Clear search
-              </Button>
-            ) : categoryFilter !== "all" ? (
-              <Button variant="outline" onClick={() => setCategoryFilter("all")}>
-                Show all categories
-              </Button>
-            ) : (
-              <Button asChild>
-                <Link href="/create">Create the first one</Link>
-              </Button>
-            )}
-          </div>
-        ) : (
-          // `relative` anchors the floating "Updating…" pill so showing it never
-          // reflows the grid below.
-          <div className="relative">
-            {isRefreshing && (
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 rounded-full bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground shadow-md">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-                Updating...
-              </div>
-            )}
+          {isLoading ? (
+            <CampaignSkeletonGrid count={PAGE_SIZE} />
+          ) : isError ? (
             <div
-              className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity duration-200 ${
-                isRefreshing ? "opacity-50" : "opacity-100"
-              }`}
-              aria-busy={isRefreshing}
+              role="alert"
+              className="flex flex-col items-center justify-center gap-4 rounded-lg border border-destructive/30 bg-destructive/5 px-6 py-16 text-center"
             >
-              {filtered.map((campaign) => (
-                <CampaignCard key={campaign.id.toString()} campaign={campaign} />
-              ))}
+              <div className="rounded-full bg-destructive/10 p-3">
+                <AlertTriangle className="h-5 w-5 text-destructive" aria-hidden="true" />
+              </div>
+              <div className="space-y-1">
+                <h2 className="font-semibold text-foreground">Unable to load campaigns</h2>
+                <p className="text-sm text-muted-foreground max-w-sm">
+                  We couldn&apos;t reach the Stellar network. Check your connection and try again.
+                </p>
+              </div>
+              <Button onClick={() => refetch()}>
+                <RotateCw className="mr-2 h-4 w-4" aria-hidden="true" />
+                Retry
+              </Button>
             </div>
-          </div>
-        )}
-
-        <p className="sr-only" role="status" aria-live="polite">
-          {isRefreshing ? "Updating campaigns" : ""}
-        </p>
-
-        {/* Skeletons are appended only while the list is growing, so a
-            background refresh never makes the page jump. */}
-        {isPaginating && <CampaignSkeletonGrid count={3} />}
-
-        {/* Explicit fallback for the IntersectionObserver above: always available,
-            including while a search term is narrowing the loaded results. */}
-        {hasMore && (
-          <div className="flex justify-center">
-            <Button variant="outline" onClick={loadMore} disabled={isFetching}>
-              {isFetching ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
-                  Loading...
-                </>
+          ) : filtered.length === 0 ? (
+            <div className="flex flex-col items-center gap-4 py-20 text-center">
+              <div>
+                <p className="font-medium text-foreground">No campaigns found</p>
+                <p className="text-muted-foreground">{emptyMessage}</p>
+              </div>
+              {debouncedSearch ? (
+                <Button variant="outline" onClick={() => setSearchTerm("")}>
+                  Clear search
+                </Button>
+              ) : categoryFilter !== "all" ? (
+                <Button variant="outline" onClick={() => setCategoryFilter("all")}>
+                  Show all categories
+                </Button>
               ) : (
-                "Load more"
+                <Button asChild>
+                  <Link href="/create">Create the first one</Link>
+                </Button>
               )}
-            </Button>
-          </div>
-        )}
+            </div>
+          ) : (
+            // `relative` anchors the floating "Updating…" pill so showing it never
+            // reflows the grid below.
+            <div className="relative">
+              {isRefreshing && (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 rounded-full bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground shadow-md">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                  Updating...
+                </div>
+              )}
+              <div
+                className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity duration-200 ${
+                  isRefreshing ? "opacity-50" : "opacity-100"
+                }`}
+                aria-busy={isRefreshing}
+              >
+                {filtered.map((campaign) => (
+                  <CampaignCard key={campaign.id.toString()} campaign={campaign} />
+                ))}
+              </div>
+            </div>
+          )}
 
-        <div ref={sentinelRef} className="h-4" aria-hidden="true" />
+          <p className="sr-only" role="status" aria-live="polite">
+            {isRefreshing ? "Updating campaigns" : ""}
+          </p>
+
+          {/* Skeletons are appended only while the list is growing, so a
+              background refresh never makes the page jump. */}
+          {isPaginating && <CampaignSkeletonGrid count={3} />}
+
+          {/* Explicit fallback for the IntersectionObserver above: always available,
+              including while a search term is narrowing the loaded results. */}
+          {hasMore && (
+            <div className="flex justify-center">
+              <Button variant="outline" onClick={loadMore} disabled={isFetching}>
+                {isFetching ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                    Loading...
+                  </>
+                ) : (
+                  "Load more"
+                )}
+              </Button>
+            </div>
+          )}
+
+          <div ref={sentinelRef} className="h-4" aria-hidden="true" />
+        </div>
       </main>
     </div>
   );
