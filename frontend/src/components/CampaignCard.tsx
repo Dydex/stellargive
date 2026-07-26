@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import Image from "next/image";
 import { Campaign } from "@/lib/soroban";
 import { formatTokenAmount } from "@/utils/format";
@@ -28,10 +28,11 @@ const progressIndicatorVariants: Record<ProgressVariant, string> = {
   warning: "bg-amber-500 dark:bg-amber-400",
 };
 
-export function CampaignCard({ campaign }: { campaign: Campaign }) {
+function CampaignCardComponent({ campaign, preloadedTokenMeta }: { campaign: Campaign, preloadedTokenMeta?: any }) {
   const [imgError, setImgError] = useState(false);
   const [donateOpen, setDonateOpen] = useState(false);
-  const { data: tokenMeta } = useTokenMetadata(campaign.accepted_token);
+  const { data: fetchedMeta } = useTokenMetadata(preloadedTokenMeta ? null : campaign.accepted_token);
+  const tokenMeta = preloadedTokenMeta ?? fetchedMeta;
   const decimals = tokenMeta?.decimals ?? 7;
   const symbol = tokenMeta?.symbol ?? "XLM";
 
@@ -158,3 +159,11 @@ export function CampaignCard({ campaign }: { campaign: Campaign }) {
     </Card>
   );
 }
+
+export const CampaignCard = React.memo(CampaignCardComponent, (prevProps, nextProps) => {
+  return (
+    prevProps.campaign.id === nextProps.campaign.id &&
+    prevProps.campaign.status === nextProps.campaign.status &&
+    prevProps.campaign.raised_amount === nextProps.campaign.raised_amount
+  );
+});
