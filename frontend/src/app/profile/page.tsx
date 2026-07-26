@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { CampaignCard } from "@/components/CampaignCard";
@@ -21,6 +21,7 @@ import {
 } from "@/lib/eventData";
 import { AddressLink } from "@/components/AddressLink";
 import { useWallet } from "@/lib/WalletProvider";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { UserCircle, Wallet, HandCoins, TrendingUp, Megaphone } from "lucide-react";
 
 const ZERO_ADDRESS = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
@@ -34,7 +35,6 @@ function normalizeAddress(value: unknown): string | null {
 
 export default function ProfilePage() {
   const { address, isConnected } = useWallet();
-  const [activeTab, setActiveTab] = useState<"campaigns" | "donations">("campaigns");
   const {
     data: campaigns,
     isLoading: campaignsLoading,
@@ -164,54 +164,36 @@ export default function ProfilePage() {
             />
           </div>
 
-          <div className="flex items-center gap-4 border-b border-border mt-8">
-            <button
-              onClick={() => setActiveTab("campaigns")}
-              className={`pb-3 text-sm font-medium transition-colors ${
-                activeTab === "campaigns"
-                  ? "border-b-2 border-primary text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              My Campaigns
-            </button>
-            <button
-              onClick={() => setActiveTab("donations")}
-              className={`pb-3 text-sm font-medium transition-colors ${
-                activeTab === "donations"
-                  ? "border-b-2 border-primary text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              My Donations
-            </button>
-          </div>
+          <Tabs defaultValue="campaigns" className="mt-8">
+            <TabsList aria-label="Profile sections">
+              <TabsTrigger value="campaigns">My Campaigns</TabsTrigger>
+              <TabsTrigger value="donations">My Donations</TabsTrigger>
+            </TabsList>
 
-          <div className="mt-8 space-y-8">
-            {activeTab === "campaigns" ? (
-              <>
-                <Section
-                  title="Campaigns I Created"
-                  emptyText="You haven't created any campaigns yet."
-                  campaigns={created}
-                  action={
-                    <Button asChild variant="outline" size="sm">
-                      <Link href="/create">Create your first campaign</Link>
-                    </Button>
-                  }
-                />
-                <Section
-                  title="Campaigns I Supported"
-                  emptyText="You haven't donated to any campaigns yet."
-                  campaigns={supported}
-                  action={
-                    <Button asChild variant="outline" size="sm">
-                      <Link href="/explore">Explore campaigns</Link>
-                    </Button>
-                  }
-                />
-              </>
-            ) : (
+            <TabsContent value="campaigns" className="mt-8 space-y-8">
+              <Section
+                title="Campaigns I Created"
+                emptyText="You haven't created any campaigns yet."
+                campaigns={created}
+                action={
+                  <Button asChild variant="outline" size="sm">
+                    <Link href="/create">Create your first campaign</Link>
+                  </Button>
+                }
+              />
+              <Section
+                title="Campaigns I Supported"
+                emptyText="You haven't donated to any campaigns yet."
+                campaigns={supported}
+                action={
+                  <Button asChild variant="outline" size="sm">
+                    <Link href="/explore">Explore campaigns</Link>
+                  </Button>
+                }
+              />
+            </TabsContent>
+
+            <TabsContent value="donations" className="mt-8">
               <DonationsSection
                 donations={myDonationsEvents}
                 campaigns={campaigns ?? []}
@@ -222,8 +204,8 @@ export default function ProfilePage() {
                   </Button>
                 }
               />
-            )}
-          </div>
+            </TabsContent>
+          </Tabs>
         </AsyncBoundary>
       </main>
     </div>
