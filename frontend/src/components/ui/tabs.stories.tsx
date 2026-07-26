@@ -106,7 +106,7 @@ export const Controlled: Story = {
     return (
       <div className="w-[480px] space-y-4">
         <p className="text-xs text-muted-foreground font-mono">selected: {tab}</p>
-        <Tabs value={tab} onValueChange={setTab}>
+        <Tabs defaultValue="campaigns" value={tab} onValueChange={setTab}>
           <TabsList aria-label="Controlled demo">
             <TabsTrigger value="campaigns">My Campaigns</TabsTrigger>
             <TabsTrigger value="donations">My Donations</TabsTrigger>

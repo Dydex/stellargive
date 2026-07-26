@@ -102,7 +102,10 @@ function TopDonors({ campaignId }: { campaignId: bigint }) {
 }
 
 function CampaignTimeline({ campaign }: { campaign: any }) {
-  const { data: allEvents } = useEvents();
+  const { data: allEvents, isLoading } = useEvents();
+
+  if (isLoading) return <Skeleton className="h-32 w-full mt-6" />;
+
   const createdEvent = allEvents?.find(
     (e: any) => e.topic === "created" && e.data && BigInt(e.data[0]) === campaign.id,
   );

@@ -20,6 +20,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useAddToWhitelist, useCancelCampaign, useAddUpdate } from "@/hooks/useSoroban";
+import { toast } from "sonner";
 import { Campaign } from "@/lib/soroban";
 import { CampaignStatusBadge } from "@/components/CampaignStatusBadge";
 import { PostUpdateForm } from "@/components/PostUpdateForm";
@@ -46,7 +47,8 @@ export function AdminPanel({ ownedCampaigns }: AdminPanelProps) {
   const [addressToWhitelist, setAddressToWhitelist] = useState<string>("");
   const [validationError, setValidationError] = useState<string>("");
   const [successMessage, setSuccessMessage] = useState<string>("");
-  const [errorMessage, setErrorMessage] = useState<string>("");
+
+  const [whitelistedAddresses, setWhitelistedAddresses] = useState<Record<string, string[]>>({});
 
   const [campaignToCancel, setCampaignToCancel] = useState<Campaign | null>(null);
   const [updateCampaign, setUpdateCampaign] = useState<Campaign | null>(null);
@@ -54,13 +56,11 @@ export function AdminPanel({ ownedCampaigns }: AdminPanelProps) {
   const handleSelectCampaign = (id: string) => {
     setSelectedCampaignId(id);
     setSuccessMessage("");
-    setErrorMessage("");
   };
 
   const handleAddressChange = (val: string) => {
     setAddressToWhitelist(val);
     setSuccessMessage("");
-    setErrorMessage("");
     if (val && !/^G[A-Z0-9]{55}$/.test(val)) {
       setValidationError(
         "Invalid Stellar address format (must start with G and be 56 characters)",
@@ -73,7 +73,7 @@ export function AdminPanel({ ownedCampaigns }: AdminPanelProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCampaignId) {
-      setErrorMessage("Please select a campaign.");
+      toast.error("Please select a campaign.");
       return;
     }
     if (!addressToWhitelist || !/^G[A-Z0-9]{55}$/.test(addressToWhitelist)) {
@@ -89,9 +89,13 @@ export function AdminPanel({ ownedCampaigns }: AdminPanelProps) {
       setSuccessMessage(
         `Successfully whitelisted ${addressToWhitelist} for campaign #${selectedCampaignId}`,
       );
+      setWhitelistedAddresses((prev) => ({
+        ...prev,
+        [selectedCampaignId]: [...(prev[selectedCampaignId] || []), addressToWhitelist],
+      }));
       setAddressToWhitelist("");
     } catch (err: any) {
-      setErrorMessage(err?.message || "Failed to whitelist address.");
+      toast.error(err?.message || "Failed to whitelist address.");
     }
   };
 
@@ -204,13 +208,6 @@ export function AdminPanel({ ownedCampaigns }: AdminPanelProps) {
             </div>
           )}
 
-          {errorMessage && (
-            <div className="p-3 bg-destructive/15 text-destructive text-sm rounded-md flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-              <span>{errorMessage}</span>
-            </div>
-          )}
-
           <Button
             type="submit"
             className="w-full"
@@ -230,6 +227,25 @@ export function AdminPanel({ ownedCampaigns }: AdminPanelProps) {
               "Whitelist Address"
             )}
           </Button>
+
+          {selectedCampaignId && whitelistedAddresses[selectedCampaignId]?.length > 0 && (
+            <div className="pt-4 border-t space-y-3">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                Recently Whitelisted
+              </h3>
+              <ul className="space-y-1.5">
+                {whitelistedAddresses[selectedCampaignId].map((addr) => (
+                  <li
+                    key={addr}
+                    className="flex items-center gap-2 text-sm font-mono text-foreground bg-muted/30 px-3 py-1.5 rounded-md"
+                  >
+                    <CheckCircle className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                    {addr}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </form>
       </div>
 
