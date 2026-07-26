@@ -1,6 +1,14 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 
+/**
+ * Shared blur placeholder for campaign images.
+ * A minimal grey SVG encoded as a base64 data URL — avoids duplicating the
+ * string in every component and keeps bundle size identical.
+ */
+export const CAMPAIGN_IMAGE_BLUR_DATA_URL =
+  "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNzAwIiBoZWlnaHQ9IjQ3NSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNzAwIiBoZWlnaHQ9IjQ3NSIgZmlsbD0iI2UwZTBlMCIvPjwvc3ZnPg==";
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
