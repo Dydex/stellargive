@@ -142,19 +142,22 @@ export default function ActivityPage() {
         ) : (
           <ErrorBoundary heading="Activity feed">
             <div className="relative hidden md:block overflow-x-auto">
-              {showIndicator && (
-                <div className="absolute -top-12 left-1/2 -translate-x-1/2 z-10 bg-primary text-primary-foreground px-4 py-1.5 rounded-full text-sm font-medium shadow-md animate-in fade-in slide-in-from-top-4 duration-300">
-                  New activity
-                </div>
-              )}
+              <div aria-live="polite" aria-atomic="true" className="absolute -top-12 left-1/2 -translate-x-1/2 z-10">
+                {showIndicator && (
+                  <div className="bg-primary text-primary-foreground px-4 py-1.5 rounded-full text-sm font-medium shadow-md animate-in fade-in slide-in-from-top-4 duration-300">
+                    New activity
+                  </div>
+                )}
+              </div>
               <Card>
                 <table className="w-full text-sm text-left">
+                  <caption className="sr-only">Recent Transaction History</caption>
                   <thead className="text-xs text-muted-foreground uppercase bg-muted/20">
                     <tr>
-                      <th className="px-4 py-3 rounded-tl-md">Status</th>
-                      <th className="px-4 py-3">Action</th>
-                      <th className="px-4 py-3">Time</th>
-                      <th className="px-4 py-3 rounded-tr-md text-right">Tx Hash</th>
+                      <th scope="col" className="px-4 py-3 rounded-tl-md">Status</th>
+                      <th scope="col" className="px-4 py-3">Action</th>
+                      <th scope="col" className="px-4 py-3">Time</th>
+                      <th scope="col" className="px-4 py-3 rounded-tr-md text-right">Tx Hash</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -167,11 +170,13 @@ export default function ActivityPage() {
             </div>
 
             <div className="relative md:hidden space-y-4">
-              {showIndicator && (
-                <div className="absolute -top-12 left-1/2 -translate-x-1/2 z-10 bg-primary text-primary-foreground px-4 py-1.5 rounded-full text-sm font-medium shadow-md animate-in fade-in slide-in-from-top-4 duration-300">
-                  New activity
-                </div>
-              )}
+              <div aria-live="polite" aria-atomic="true" className="absolute -top-12 left-1/2 -translate-x-1/2 z-10">
+                {showIndicator && (
+                  <div className="bg-primary text-primary-foreground px-4 py-1.5 rounded-full text-sm font-medium shadow-md animate-in fade-in slide-in-from-top-4 duration-300">
+                    New activity
+                  </div>
+                )}
+              </div>
               {visible.map((event: any, idx: number) => (
                 <ActivityRowMobile key={event?.id ?? `event-${idx}`} event={event} />
               ))}
@@ -308,9 +313,9 @@ function ActivityRowMobile({ event }: { event: any }) {
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-2">
           <div className={`p-1.5 rounded-full shrink-0 ${iconBg}`}>{icon}</div>
-          <span className="uppercase text-[10px] font-bold tracking-wider text-muted-foreground">
+          <h2 className="uppercase text-[10px] font-bold tracking-wider text-muted-foreground m-0">
             {label}
-          </span>
+          </h2>
         </div>
         <span className="text-xs text-muted-foreground">{when}</span>
       </div>

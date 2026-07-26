@@ -121,6 +121,7 @@ export function DonateModal({
   const [showSuccess, setShowSuccess] = useState(false);
   const [successTxHash, setSuccessTxHash] = useState("");
   const [successAmount, setSuccessAmount] = useState("");
+  const [successAnnouncement, setSuccessAnnouncement] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const feeEstimate = useDonateFeeEstimate({
@@ -202,6 +203,7 @@ export function DonateModal({
       }
       setSuccessAmount(data.amount);
       setSuccessTxHash((result as any).hash || "");
+      setSuccessAnnouncement(`Donation of ${data.amount} ${symbol} confirmed`);
       setShowSuccess(true);
       setIsOpen(false);
       setValue("amount", "");
@@ -355,7 +357,6 @@ export function DonateModal({
           {feeEstimate.data != null && <GasWarning estimatedFeeStroops={feeEstimate.data} />}
           {submitError && (
             <div
-              role="alert"
               className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-400"
             >
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
@@ -380,7 +381,15 @@ export function DonateModal({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showSuccess} onOpenChange={setShowSuccess}>
+      <Dialog 
+        open={showSuccess} 
+        onOpenChange={(open) => {
+          setShowSuccess(open);
+          if (!open) {
+            setSuccessAnnouncement("");
+          }
+        }}
+      >
         <DialogContent
           className="max-w-md text-center p-6 gap-6"
           aria-labelledby="donate-success-title"
@@ -429,6 +438,14 @@ export function DonateModal({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* Screen Reader Announcements */}
+      <div aria-live="polite" className="sr-only">
+        {successAnnouncement}
+      </div>
+      <div aria-live="assertive" className="sr-only">
+        {submitError}
+      </div>
     </>
   );
 }
