@@ -546,3 +546,34 @@ export function useTokenMetadata(contractId: string | null | undefined) {
     retry: 2,
   });
 }
+
+export function useTokenMetadataBatch(contractIds: string[]) {
+  const queryClient = useQueryClient();
+  const uniqueIds = Array.from(new Set(contractIds)).filter(Boolean).sort();
+
+  return useQuery({
+    queryKey: ["token-metadata-batch", uniqueIds.join(",")],
+    queryFn: async () => {
+      if (uniqueIds.length === 0) return {};
+      const { getTokenMetadata } = await import("@/lib/soroban");
+      
+      const results = await Promise.all(
+        uniqueIds.map(async (id) => {
+          try {
+            const meta = await getTokenMetadata(id);
+            // Pre-populate individual cache so CampaignCard doesn't fetch
+            if (meta) {
+              queryClient.setQueryData(["token-metadata", id], meta);
+            }
+            return [id, meta] as const;
+          } catch (e) {
+            return [id, null] as const;
+          }
+        })
+      );
+      return Object.fromEntries(results);
+    },
+    enabled: uniqueIds.length > 0,
+    staleTime: 1000 * 60 * 60 * 24,
+  });
+}

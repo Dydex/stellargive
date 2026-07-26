@@ -8,7 +8,7 @@ import { CampaignCard } from "@/components/CampaignCard";
 import { CampaignStatusBadge } from "@/components/CampaignStatusBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useCampaignsPaged } from "@/hooks/useSoroban";
+import { useCampaignsPaged, useTokenMetadataBatch } from "@/hooks/useSoroban";
 import { useCampaignSearch } from "@/hooks/useCampaignSearch";
 import { TokenSelector } from "@/components/TokenSelector";
 import { CategorySelector, CATEGORIES, type CategoryKey } from "@/components/CategorySelector";
@@ -195,6 +195,11 @@ function ExploreContent() {
     return sortCampaigns(byCategory, sortBy);
   }, [searched, statusFilter, sortBy, categoryFilter, tokenFilter]);
 
+  const uniqueTokens = useMemo(() => {
+    return Array.from(new Set(filtered.map((c) => c.accepted_token)));
+  }, [filtered]);
+  const { data: tokenMetas } = useTokenMetadataBatch(uniqueTokens);
+
   const emptyMessage = useMemo(() => {
     const inCategory =
       categoryFilter === "all"
@@ -380,7 +385,7 @@ function ExploreContent() {
                 aria-busy={isRefreshing}
               >
                 {filtered.map((campaign) => (
-                  <CampaignCard key={campaign.id.toString()} campaign={campaign} />
+                  <CampaignCard key={campaign.id.toString()} campaign={campaign} preloadedTokenMeta={tokenMetas?.[campaign.accepted_token]} />
                 ))}
               </div>
             </div>

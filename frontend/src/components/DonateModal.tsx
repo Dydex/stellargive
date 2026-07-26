@@ -29,7 +29,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Check, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
-import confetti from "canvas-confetti";
 
 const FIRED_MILESTONES = new Set<string>();
 const milestoneKey = (campaignId: bigint, m: MilestonePercent) => `${campaignId.toString()}:${m}`;
@@ -160,7 +159,11 @@ export function DonateModal({
 
   useEffect(() => {
     if (donate.isSuccess) {
-      confetti({ spread: 90, particleCount: 100 });
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      import("canvas-confetti").then((module) => {
+        const confetti = module.default;
+        confetti({ spread: 90, particleCount: 100 });
+      });
     }
   }, [donate.isSuccess]);
 

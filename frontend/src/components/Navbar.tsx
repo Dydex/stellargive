@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { WalletConnect } from "@/components/WalletConnect";
 import dynamic from "next/dynamic";
 const CreateCampaignForm = dynamic(
@@ -24,12 +25,22 @@ function usePrefersReducedMotion(): boolean {
   return prefers;
 }
 
+
+const NAV_LINKS = [
+  { href: "/explore", label: "Explore" },
+  { href: "/activity", label: "Activity" },
+  { href: "/leaderboard", label: "Leaderboard" },
+  { href: "/profile", label: "My Campaigns" },
+  { href: "/faq", label: "FAQ" },
+];
+
 export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
   const hadOpen = useRef(false);
+  const pathname = usePathname();
 
   // Focus trap + ESC close
   useEffect(() => {
@@ -95,36 +106,21 @@ export function Navbar() {
 
         {/* Desktop navigation */}
         <div className="hidden md:flex items-center gap-4">
-          <Link
-            href="/explore"
-            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Explore
-          </Link>
-          <Link
-            href="/activity"
-            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Activity
-          </Link>
-          <Link
-            href="/leaderboard"
-            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Leaderboard
-          </Link>
-          <Link
-            href="/profile"
-            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-          >
-            My Campaigns
-          </Link>
-          <Link
-            href="/faq"
-            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-          >
-            FAQ
-          </Link>
+          {NAV_LINKS.map((link) => {
+            const isActive = pathname === link.href || pathname.startsWith(`${link.href}/`);
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                aria-current={isActive ? "page" : undefined}
+                className={`text-sm font-medium transition-colors ${
+                  isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {link.label}
+              </Link>
+            );
+          })}
           <CreateCampaignForm />
           <div className="h-6 w-px bg-border mx-2" />
           <ThemeToggle />
@@ -172,41 +168,22 @@ export function Navbar() {
           </IconButton>
         </div>
         <nav className="flex flex-col p-4 space-y-4" aria-label="Mobile navigation">
-          <Link
-            href="/explore"
-            className="text-base font-medium text-muted-foreground hover:text-foreground transition-colors py-1"
-            onClick={closeMenu}
-          >
-            Explore
-          </Link>
-          <Link
-            href="/activity"
-            className="text-base font-medium text-muted-foreground hover:text-foreground transition-colors py-1"
-            onClick={closeMenu}
-          >
-            Activity
-          </Link>
-          <Link
-            href="/leaderboard"
-            className="text-base font-medium text-muted-foreground hover:text-foreground transition-colors py-1"
-            onClick={closeMenu}
-          >
-            Leaderboard
-          </Link>
-          <Link
-            href="/profile"
-            className="text-base font-medium text-muted-foreground hover:text-foreground transition-colors py-1"
-            onClick={closeMenu}
-          >
-            My Campaigns
-          </Link>
-          <Link
-            href="/faq"
-            className="text-base font-medium text-muted-foreground hover:text-foreground transition-colors py-1"
-            onClick={closeMenu}
-          >
-            FAQ
-          </Link>
+          {NAV_LINKS.map((link) => {
+            const isActive = pathname === link.href || pathname.startsWith(`${link.href}/`);
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                aria-current={isActive ? "page" : undefined}
+                className={`text-base font-medium transition-colors py-1 ${
+                  isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                }`}
+                onClick={closeMenu}
+              >
+                {link.label}
+              </Link>
+            );
+          })}
           <div className="pt-2 border-t">
             <CreateCampaignForm />
           </div>
