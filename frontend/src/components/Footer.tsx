@@ -6,7 +6,15 @@ import { Check, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { CONTRACT_ID } from "@/lib/soroban";
 import { cn } from "@/lib/utils";
+import { NETWORK_PASSPHRASE } from "@/lib/soroban";
 import { useRpcHealth, type RpcStatus } from "@/hooks/useRpcHealth";
+
+function networkLabel(): string {
+  if (!NETWORK_PASSPHRASE) return "unknown";
+  if (NETWORK_PASSPHRASE.includes("testnet") || NETWORK_PASSPHRASE.includes("Test")) return "testnet";
+  if (NETWORK_PASSPHRASE.includes("mainnet") || NETWORK_PASSPHRASE.includes("Main")) return "mainnet";
+  return "custom";
+}
 
 function truncate(id: string) {
   if (!id || id.length <= 12) return id;
@@ -58,6 +66,10 @@ function ContractIdDisplay() {
 
 const RPC_STATUS_CONFIG: Record<RpcStatus, { dot: string; label: (ms: number | null) => string }> =
   {
+    loading: {
+      dot: "bg-muted-foreground/40 animate-pulse",
+      label: () => "Checking RPC…",
+    },
     healthy: {
       dot: "bg-green-500",
       label: (ms) => `RPC healthy · ${ms}ms`,
@@ -74,18 +86,17 @@ const RPC_STATUS_CONFIG: Record<RpcStatus, { dot: string; label: (ms: number | n
 
 function RpcStatusDot() {
   const health = useRpcHealth();
+  const network = networkLabel();
 
-  const dotClass = health ? RPC_STATUS_CONFIG[health.status].dot : "bg-muted-foreground/40";
-  const tooltip = health
-    ? RPC_STATUS_CONFIG[health.status].label(health.latencyMs)
-    : "Checking RPC…";
+  const { dot, label } = RPC_STATUS_CONFIG[health.status];
+  const tooltip = `${label(health.latencyMs)} · ${network}`;
 
   return (
     <span className="relative inline-flex group/rpc">
       <span
         role="status"
         aria-label={tooltip}
-        className={cn("block h-2 w-2 rounded-full", dotClass)}
+        className={cn("block h-2 w-2 rounded-full", dot)}
       />
       <span
         aria-hidden

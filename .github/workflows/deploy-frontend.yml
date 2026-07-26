@@ -1,0 +1,65 @@
+name: Deploy Frontend
+
+on:
+  push:
+    tags: ["v*"]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/stellargive-frontend
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ vars.PRODUCTION_URL }}
+    concurrency: production
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull image
+        run: |
+          TAG=${GITHUB_REF_NAME#v}
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${TAG}
+
+      - name: Deploy via SSH
+        if: ${{ secrets.SSH_HOST != '' }}
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          envs: IMAGE_NAME,REGISTRY,GITHUB_REF_NAME
+          script: |
+            TAG=${GITHUB_REF_NAME#v}
+            export NEXT_PUBLIC_SOROBAN_RPC_URL="${{ secrets.NEXT_PUBLIC_SOROBAN_RPC_URL }}"
+            export NEXT_PUBLIC_NETWORK_PASSPHRASE="${{ secrets.NEXT_PUBLIC_NETWORK_PASSPHRASE }}"
+            export NEXT_PUBLIC_CONTRACT_ID="${{ secrets.NEXT_PUBLIC_CONTRACT_ID }}"
+            docker pull ${REGISTRY}/${IMAGE_NAME}:${TAG}
+            docker stop stellargive-frontend || true
+            docker rm stellargive-frontend || true
+            docker run -d \
+              --name stellargive-frontend \
+              --restart unless-stopped \
+              -p 3000:3000 \
+              -e NODE_ENV=production \
+              -e NEXT_PUBLIC_SOROBAN_RPC_URL \
+              -e NEXT_PUBLIC_NETWORK_PASSPHRASE \
+              -e NEXT_PUBLIC_CONTRACT_ID \
+              ${REGISTRY}/${IMAGE_NAME}:${TAG}
+
+      - name: Verify deployment
+        if: ${{ vars.PRODUCTION_URL != '' }}
+        run: |
+          curl -sf --retry 10 --retry-delay 5 "${{ vars.PRODUCTION_URL }}" > /dev/null
+          echo "Deployment verified at ${{ vars.PRODUCTION_URL }}"

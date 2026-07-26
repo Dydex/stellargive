@@ -126,6 +126,36 @@ You can run the entire StellarGive stack locally using Docker and Docker Compose
 | Soroban RPC / Horizon API | `8000` | `http://localhost:8000` |
 | Friendbot Funder | `8001` | `http://localhost:8001` |
 
+## Production Deployment with Docker
+
+The frontend can be deployed to production using the pre-built Docker image from GitHub Container Registry.
+
+### Manual Deployment
+
+1. **Pull and run the latest image**:
+   ```bash
+   export GITHUB_REPOSITORY_OWNER=stellargive
+   export NEXT_PUBLIC_CONTRACT_ID=<your-contract-id>
+   docker compose -f docker-compose.prod.yml up -d
+   ```
+
+2. **Environment Variables**:
+
+   | Variable | Required | Default |
+   |---|---|---|
+   | `NEXT_PUBLIC_SOROBAN_RPC_URL` | Yes | `https://soroban-testnet.stellar.org` |
+   | `NEXT_PUBLIC_NETWORK_PASSPHRASE` | Yes | `Test SDF Network ; September 2015` |
+   | `NEXT_PUBLIC_CONTRACT_ID` | Yes | — |
+   | `NEXT_PUBLIC_SENTRY_DSN` | No | — |
+
+3. **CI/CD Pipeline**: On every push to `main` or version tag (`v*`), the [`docker-publish.yml`](.github/workflows/docker-publish.yml) workflow builds the image and publishes it to `ghcr.io/<owner>/stellargive-frontend`. Deployment workflows in `.github/workflows/deploy-frontend.yml` can then pull and restart services on your target host.
+
+### Container Security
+
+- The runtime container runs as a **non-root user** (`nextjs`, UID 101).
+- Security options include `no-new-privileges:true`, dropped kernel capabilities, and a **read-only root filesystem**.
+- A health check ensures the container is serving traffic before it is considered ready.
+
 ## Live / Network Links
 
 - Soroban Testnet RPC: `https://soroban-testnet.stellar.org`
