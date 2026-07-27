@@ -57,13 +57,28 @@ export function MockWalletProvider({ children }: { children: React.ReactNode }) 
   const [mockBalance, setMockBalance] = useState("1000.0000000");
   const [mockSignedTxXdr, setMockSignedTxXdr] = useState(DEFAULT_MOCK_SIGNED_TX_XDR);
 
+  // E2E overrides, applied after mount so SSR and hydration still agree.
+  // A Playwright spec can `page.addInitScript` either of:
+  //   window.__mockWalletAddress      — pin the connected account
+  //   window.__mockWalletDisconnected — start signed out
+  React.useEffect(() => {
+    const w = window as any;
+    if (w.__mockWalletDisconnected) {
+      setAddress(null);
+      setIsConnected(false);
+    } else if (typeof w.__mockWalletAddress === "string") {
+      setAddress(w.__mockWalletAddress);
+    }
+  }, []);
+
   // Install global mocks on mount
   React.useEffect(() => {
     installFreighterMocks(address || DEFAULT_MOCK_ADDRESS, mockSignedTxXdr);
   }, [address, mockSignedTxXdr]);
 
   const connect = useCallback(async () => {
-    setAddress(DEFAULT_MOCK_ADDRESS);
+    const override = (window as any).__mockWalletAddress;
+    setAddress(typeof override === "string" ? override : DEFAULT_MOCK_ADDRESS);
     setIsConnected(true);
   }, []);
 

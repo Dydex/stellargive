@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe, toHaveNoViolations } from "jest-axe";
@@ -16,12 +16,16 @@ vi.mock("@/lib/WalletProvider", () => ({
   useWallet: vi.fn().mockReturnValue({ address: "GABC...", isConnected: true }),
 }));
 
+// Mutable so individual tests can drive the mutation into a rejected or
+// pending state without re-mocking the module.
+const donateState = vi.hoisted(() => ({
+  mutateAsync: vi.fn(),
+  isPending: false,
+  isSuccess: false,
+}));
+
 vi.mock("@/hooks/useSoroban", () => ({
-  useDonate: () => ({
-    mutateAsync: vi.fn(),
-    isPending: false,
-    isSuccess: false,
-  }),
+  useDonate: () => donateState,
   useDonateFeeEstimate: () => ({ data: null }),
   useWalletBalance: () => ({ data: null, isLoading: false }),
   getCrossedMilestones: () => [],
@@ -35,6 +39,12 @@ const baseCampaign = makeCampaign({
 });
 
 describe("DonateModal", () => {
+  beforeEach(() => {
+    donateState.mutateAsync = vi.fn().mockResolvedValue({ hash: "abc123" });
+    donateState.isPending = false;
+    donateState.isSuccess = false;
+  });
+
   it("should have no accessibility violations in trigger state", async () => {
     const { container } = render(<DonateModal campaign={baseCampaign} />);
     const results = await axe(container);
@@ -102,6 +112,78 @@ describe("DonateModal", () => {
 
     await waitFor(() => {
       expect(screen.getByText(/exceeds the remaining goal/i)).toBeInTheDocument();
+    });
+  });
+
+  describe("mutation error state", () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("surfaces the mapped error and never opens the success dialog when the donation rejects", async () => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      donateState.mutateAsync = vi.fn().mockRejectedValue(new Error("Network Error"));
+
+      render(<DonateModal campaign={baseCampaign} open onOpenChange={() => {}} />);
+
+      const input = await screen.findByLabelText(/Amount/i);
+      fireEvent.change(input, { target: { value: "10" } });
+
+      const confirmBtn = screen.getByRole("button", { name: /Confirm Donation/i });
+      await waitFor(() => expect(confirmBtn).toBeEnabled());
+      fireEvent.click(confirmBtn);
+
+      await waitFor(() => expect(donateState.mutateAsync).toHaveBeenCalled());
+
+      // Rendered inline and again in the assertive live region.
+      await waitFor(() => {
+        expect(
+          screen.getAllByText(/Network error — please check your connection and try again\./i)
+            .length,
+        ).toBeGreaterThan(0);
+      });
+
+      expect(screen.queryByText(/Donation Successful!/i)).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: /View on StellarExpert/i })).not.toBeInTheDocument();
+    });
+
+    it("blocks submit for a non-numeric amount", async () => {
+      render(<DonateModal campaign={baseCampaign} open onOpenChange={() => {}} />);
+
+      const input = await screen.findByLabelText(/Amount/i);
+      fireEvent.change(input, { target: { value: "abc" } });
+      fireEvent.blur(input);
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /Confirm Donation/i })).toBeDisabled();
+      });
+      expect(screen.getByText(/Enter a valid number/i)).toBeInTheDocument();
+      expect(donateState.mutateAsync).not.toHaveBeenCalled();
+    });
+
+    it("blocks submit for an amount below the minimum donation", async () => {
+      render(<DonateModal campaign={baseCampaign} open onOpenChange={() => {}} />);
+
+      const input = await screen.findByLabelText(/Amount/i);
+      fireEvent.change(input, { target: { value: "0" } });
+      fireEvent.blur(input);
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /Confirm Donation/i })).toBeDisabled();
+      });
+      expect(screen.getByText(/Minimum donation is/i)).toBeInTheDocument();
+      expect(donateState.mutateAsync).not.toHaveBeenCalled();
+    });
+
+    it("disables the confirm button while the mutation is pending", async () => {
+      donateState.isPending = true;
+
+      render(<DonateModal campaign={baseCampaign} open onOpenChange={() => {}} />);
+
+      const confirmBtn = await screen.findByRole("button", { name: /Donating\.\.\./i });
+      expect(confirmBtn).toBeDisabled();
+      expect(await screen.findByLabelText(/Amount/i)).toBeDisabled();
+      expect(screen.getByRole("button", { name: /Cancel/i })).toBeDisabled();
     });
   });
 
