@@ -9,7 +9,10 @@ use soroban_sdk::{symbol_short, String, Symbol, TryFromVal};
 
 mod helpers;
 use helpers::{create_default_campaign, register_and_setup, set_timestamp, single_ben};
-use stellar_give::{CampaignUpdateEvent, CreatedEvent, DonationEvent, RefundEvent};
+use stellar_give::{
+    AutoClaimedEvent, CampaignUpdateEvent, CreatedEvent, DonationEvent, GoalReachedEvent,
+    RefundEvent,
+};
 
 /// `create_campaign` emits exactly one contract event whose single topic is
 /// `symbol_short!("created")`.
@@ -515,4 +518,214 @@ fn test_add_update_emits_only_one_event() {
         update_event_count, 1,
         "add_update must emit exactly one event"
     );
+}
+
+// =============================================================================
+// Issue #524 — Donation and Auto-Claim Event Topic Tests
+// =============================================================================
+
+/// An anonymous donation's `DonationEvent.donor` must be the sentinel address
+/// (`GAAAA...`), not the actual donor address.
+#[test]
+fn test_anonymous_donation_event_donor_is_sentinel() {
+    let (env, client, creator, beneficiary, donor, _admin, token_client, _) = register_and_setup();
+    set_timestamp(&env, 1_000);
+
+    let bens = single_ben(&env, &beneficiary);
+    let id = client.create_campaign(
+        &creator,
+        &bens,
+        &String::from_str(&env, "Anonymous Fund"),
+        &String::from_str(&env, "A test campaign description."),
+        &String::from_str(&env, "https://example.com/meta"),
+        &symbol_short!("relief"),
+        &10_000_000_i128,
+        &2_000_u64,
+        &token_client.address,
+        &None,
+    );
+
+    client.donate(&donor, &id, &1_000_000_i128, &true, &None);
+
+    let event = env
+        .events()
+        .all()
+        .into_iter()
+        .find(|(addr, topics, _)| {
+            addr == &client.address
+                && topics
+                    .get(0)
+                    .and_then(|t| Symbol::try_from_val(&env, &t).ok())
+                    == Some(symbol_short!("donation"))
+        })
+        .expect("DonationEvent must be emitted");
+
+    let payload = DonationEvent::try_from_val(&env, &event.2)
+        .expect("event data must decode as DonationEvent");
+
+    let sentinel = soroban_sdk::Address::from_string(&String::from_str(
+        &env,
+        "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+    ));
+    assert_eq!(
+        payload.donor, sentinel,
+        "anonymous donation donor must be the sentinel address"
+    );
+    assert_eq!(payload.campaign_id, id);
+    assert_eq!(payload.amount, 1_000_000_i128);
+}
+
+/// Donation without a comment must have `comment: None`.
+#[test]
+fn test_donation_event_without_comment() {
+    let (env, client, creator, beneficiary, donor, _admin, token_client, _) = register_and_setup();
+    set_timestamp(&env, 1_000);
+
+    let bens = single_ben(&env, &beneficiary);
+    let id = client.create_campaign(
+        &creator,
+        &bens,
+        &String::from_str(&env, "No Comment Fund"),
+        &String::from_str(&env, "A test campaign description."),
+        &String::from_str(&env, "https://example.com/meta"),
+        &symbol_short!("relief"),
+        &10_000_000_i128,
+        &2_000_u64,
+        &token_client.address,
+        &None,
+    );
+
+    client.donate(&donor, &id, &1_000_000_i128, &false, &None);
+
+    let event = env
+        .events()
+        .all()
+        .into_iter()
+        .find(|(addr, topics, _)| {
+            addr == &client.address
+                && topics
+                    .get(0)
+                    .and_then(|t| Symbol::try_from_val(&env, &t).ok())
+                    == Some(symbol_short!("donation"))
+        })
+        .expect("DonationEvent must be emitted");
+
+    let payload = DonationEvent::try_from_val(&env, &event.2)
+        .expect("event data must decode as DonationEvent");
+
+    assert_eq!(payload.comment, None, "donation without comment must have comment: None");
+}
+
+/// A goal-crossing donation emits `GoalReachedEvent` then `AutoClaimedEvent`
+/// with the first beneficiary and pre-zeroed `total_raised`.
+#[test]
+fn test_goal_crossing_donation_emits_goal_reached_and_autoclaimed() {
+    let (env, client, creator, beneficiary, donor, _admin, token_client, _) = register_and_setup();
+    set_timestamp(&env, 1_000);
+
+    let bens = single_ben(&env, &beneficiary);
+    let target = 10_000_000_i128;
+    let id = client.create_campaign(
+        &creator,
+        &bens,
+        &String::from_str(&env, "Goal Reach Fund"),
+        &String::from_str(&env, "A test campaign description."),
+        &String::from_str(&env, "https://example.com/meta"),
+        &symbol_short!("relief"),
+        &target,
+        &5_000_u64,
+        &token_client.address,
+        &None,
+    );
+
+    // Donate exactly the target — triggers goal_reached + auto-claim
+    client.donate(&donor, &id, &target, &false, &None);
+
+    let all_events = env.events().all();
+
+    // Verify GoalReachedEvent
+    let goal_event = all_events
+        .iter()
+        .find(|(addr, topics, _)| {
+            addr == &client.address
+                && topics
+                    .get(0)
+                    .and_then(|t| Symbol::try_from_val(&env, &t).ok())
+                    == Some(Symbol::new(&env, "goal_reached"))
+        })
+        .expect("GoalReachedEvent must be emitted on goal crossing");
+
+    let goal_payload = GoalReachedEvent::try_from_val(&env, &goal_event.2)
+        .expect("event data must decode as GoalReachedEvent");
+    assert_eq!(goal_payload.campaign_id, id);
+    assert_eq!(goal_payload.total_raised, target);
+
+    // Verify AutoClaimedEvent
+    let autoclaim_event = all_events
+        .iter()
+        .find(|(addr, topics, _)| {
+            addr == &client.address
+                && topics
+                    .get(0)
+                    .and_then(|t| Symbol::try_from_val(&env, &t).ok())
+                    == Some(Symbol::new(&env, "autoclaimed"))
+        })
+        .expect("AutoClaimedEvent must be emitted after goal crossing");
+
+    let autoclaim_payload = AutoClaimedEvent::try_from_val(&env, &autoclaim_event.2)
+        .expect("event data must decode as AutoClaimedEvent");
+    assert_eq!(autoclaim_payload.campaign_id, id);
+    assert_eq!(autoclaim_payload.total_raised, target);
+    assert_eq!(
+        autoclaim_payload.beneficiary, beneficiary,
+        "autoclaimed beneficiary must be the first (and only) beneficiary"
+    );
+}
+
+/// DonationEvent fields must decode correctly via `try_from_val` with all
+/// required fields: campaign_id, donor, amount, total_raised, accepted_token, comment.
+#[test]
+fn test_donation_event_all_fields_decoded() {
+    let (env, client, creator, beneficiary, donor, _admin, token_client, _) = register_and_setup();
+    set_timestamp(&env, 1_000);
+
+    let bens = single_ben(&env, &beneficiary);
+    let id = client.create_campaign(
+        &creator,
+        &bens,
+        &String::from_str(&env, "Full Decode Fund"),
+        &String::from_str(&env, "A test campaign description."),
+        &String::from_str(&env, "https://example.com/meta"),
+        &symbol_short!("relief"),
+        &10_000_000_i128,
+        &2_000_u64,
+        &token_client.address,
+        &None,
+    );
+
+    let comment = String::from_str(&env, "great cause!");
+    client.donate(&donor, &id, &2_000_000_i128, &false, &Some(comment.clone()));
+
+    let event = env
+        .events()
+        .all()
+        .into_iter()
+        .find(|(addr, topics, _)| {
+            addr == &client.address
+                && topics
+                    .get(0)
+                    .and_then(|t| Symbol::try_from_val(&env, &t).ok())
+                    == Some(symbol_short!("donation"))
+        })
+        .expect("DonationEvent must be emitted");
+
+    let payload = DonationEvent::try_from_val(&env, &event.2)
+        .expect("event data must decode as DonationEvent");
+
+    assert_eq!(payload.campaign_id, id);
+    assert_eq!(payload.donor, donor);
+    assert_eq!(payload.amount, 2_000_000_i128);
+    assert_eq!(payload.total_raised, 2_000_000_i128);
+    assert_eq!(payload.accepted_token, token_client.address);
+    assert_eq!(payload.comment, Some(comment));
 }

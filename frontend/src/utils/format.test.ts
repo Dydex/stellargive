@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { formatStroop, formatAddress, formatXLM, formatTokenAmount, toRawAmount } from "./format";
+import {
+  formatStroop,
+  formatAddress,
+  formatXLM,
+  formatTokenAmount,
+  formatBasisPoints,
+  toRawAmount,
+} from "./format";
 
 describe("format utils", () => {
   describe("formatStroop", () => {
@@ -82,6 +89,40 @@ describe("format utils", () => {
       expect(() => toRawAmount("abc", 7)).toThrow("Invalid amount: not a number");
       expect(() => toRawAmount("1.123", 2)).toThrow("Invalid amount: exceeds 2 decimal places");
       expect(() => toRawAmount("", 7)).toThrow("Invalid amount: not a number");
+    });
+
+    it("should handle .5 and 5. edge cases", () => {
+      expect(toRawAmount(".5", 7)).toBe(5000000n);
+      expect(toRawAmount("5.", 7)).toBe(50000000n);
+      expect(toRawAmount(".5", 1)).toBe(5n);
+      expect(toRawAmount("5.", 1)).toBe(50n);
+    });
+
+    it("should reject over-precision inputs", () => {
+      expect(() => toRawAmount("1.12345678", 7)).toThrow("Invalid amount: exceeds 7 decimal places");
+      expect(() => toRawAmount("0.1234567890", 9)).toThrow("Invalid amount: exceeds 9 decimal places");
+    });
+
+    it("should handle negative inputs with various decimals", () => {
+      expect(toRawAmount("-5.", 7)).toBe(-50000000n);
+      expect(toRawAmount("-.5", 7)).toBe(-5000000n);
+      expect(toRawAmount("-12.34", 2)).toBe(-1234n);
+    });
+  });
+
+  describe("formatBasisPoints", () => {
+    it("should format integer percentages", () => {
+      expect(formatBasisPoints(100)).toBe("1%");
+      expect(formatBasisPoints(500)).toBe("5%");
+      expect(formatBasisPoints(0)).toBe("0%");
+      expect(formatBasisPoints(10000)).toBe("100%");
+    });
+
+    it("should format fractional percentages with two decimals", () => {
+      expect(formatBasisPoints(150)).toBe("1.50%");
+      expect(formatBasisPoints(33)).toBe("0.33%");
+      expect(formatBasisPoints(67)).toBe("0.67%");
+      expect(formatBasisPoints(1234)).toBe("12.34%");
     });
   });
 });
