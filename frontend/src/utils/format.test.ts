@@ -11,16 +11,19 @@ import {
 
 describe("format utils", () => {
   describe("formatStroop", () => {
-    it("should format stroop boundaries correctly", () => {
-      const cases = [
-        { input: 0n, expected: "0.0000000" },
-        { input: 1n, expected: "0.0000001" }, // dust
-        { input: 10000000n, expected: "1.0000000" }, // 1 XLM
-        { input: 100000000000000n, expected: "10000000.0000000" }, // large amount
-      ];
-      cases.forEach(({ input, expected }) => {
-        expect(formatStroop(input)).toBe(expected);
-      });
+    it("delegates to formatTokenAmount and trims trailing zeros", () => {
+      expect(formatStroop(0n)).toBe("0");
+      expect(formatStroop(1n)).toBe("0.0000001"); // dust
+      expect(formatStroop(10_000_000n)).toBe("1"); // 1 XLM
+      expect(formatStroop(15_000_000n)).toBe("1.5");
+      expect(formatStroop(100_000_000_000_000n)).toBe("10000000"); // large amount
+    });
+
+    it("produces the same output as formatTokenAmount(n, 7)", () => {
+      const cases = [0n, 1n, 10_000_000n, 15_500_000n, 100_000_000_000_000n];
+      for (const n of cases) {
+        expect(formatStroop(n)).toBe(formatTokenAmount(n, 7));
+      }
     });
   });
 
@@ -65,6 +68,25 @@ describe("format utils", () => {
     it("should accept string and number inputs", () => {
       expect(formatTokenAmount("10000000", 7)).toBe("1");
       expect(formatTokenAmount(10000000, 7)).toBe("1");
+    });
+
+    it("is consistent with formatStroop for 7-decimal values", () => {
+      // The canonical formatter and the stroop convenience wrapper must
+      // always agree — this is the key cross-formatter consistency check.
+      const stroopValues = [0n, 1n, 10_000_000n, 15_500_000n, 999_999_999n];
+      for (const v of stroopValues) {
+        expect(formatTokenAmount(v, 7)).toBe(formatStroop(v));
+      }
+    });
+
+    it("handles large stroop values without float precision drift", () => {
+      // Number(9_007_199_254_740_993n) loses precision in JS float arithmetic.
+      // formatTokenAmount uses pure bigint so the result is exact.
+      const large = 9_007_199_254_740_993n; // > Number.MAX_SAFE_INTEGER
+      expect(formatTokenAmount(large, 7)).toBe("900719925.4740993");
+      // The old Number()-based formatStroop would have returned "900719925.4740992"
+      // (the nearest float). Verify the new delegation path is exact:
+      expect(formatStroop(large)).toBe("900719925.4740993");
     });
   });
 

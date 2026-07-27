@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatCard } from "@/components/ui/stat-card";
 import { useRecentCampaigns, useEvents } from "@/hooks/useSoroban";
-import { fromStroops, type Campaign } from "@/lib/soroban";
+import { type Campaign } from "@/lib/soroban";
 import {
   MISSING_FIELD,
   formatEventAmount,
@@ -22,7 +22,7 @@ import {
 import { AddressLink } from "@/components/AddressLink";
 import { useWallet } from "@/lib/WalletProvider";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { normalizeAddress } from "@/utils/format";
+import { normalizeAddress, formatTokenAmount } from "@/utils/format";
 import { AlertCircle, RotateCw, UserCircle, Wallet, HandCoins, TrendingUp, Megaphone } from "lucide-react";
 
 export default function ProfilePage() {
@@ -205,12 +205,12 @@ export default function ProfilePage() {
               <StatCard
                 icon={<TrendingUp className="h-4 w-4 text-blue-500" />}
                 label="Total Raised (created)"
-                value={`${fromStroops(totalRaised)} XLM`}
+                value={`${formatTokenAmount(totalRaised, 7)} XLM`}
               />
               <StatCard
                 icon={<HandCoins className="h-4 w-4 text-green-500" />}
                 label="Total Donated"
-                value={`${fromStroops(totalDonated)} XLM`}
+                value={`${formatTokenAmount(totalDonated, 7)} XLM`}
               />
               <StatCard
                 icon={<Megaphone className="h-4 w-4 text-purple-500" />}
