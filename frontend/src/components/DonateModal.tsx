@@ -235,8 +235,14 @@ export function DonateModal({
         <DialogTrigger asChild>
           <Button
             className="flex-1"
-            disabled={isWrongNetwork}
-            title={isWrongNetwork ? "Switch to the correct network to donate" : undefined}
+            disabled={!address || isWrongNetwork}
+            title={
+              !address
+                ? "Connect your wallet to donate"
+                : isWrongNetwork
+                  ? "Switch to the correct network to donate"
+                  : undefined
+            }
           >
             Donate Now
           </Button>

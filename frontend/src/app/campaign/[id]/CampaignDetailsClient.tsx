@@ -440,7 +440,7 @@ export function CampaignDetailsClient({ params }: { params: { id: string } }) {
               setDonateAmount(undefined);
               setDonateOpen(true);
             }}
-            disabled={isWrongNetwork}
+            disabled={!address || isWrongNetwork}
           />
         </>
       )}
