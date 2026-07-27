@@ -1,0 +1,3 @@
+# Volatile proptest / snapshot artifacts regenerated on every `cargo test` run.
+# These files are not deterministic and should not be committed.
+test_snapshots/
