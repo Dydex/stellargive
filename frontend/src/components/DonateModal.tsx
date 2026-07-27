@@ -29,6 +29,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Check, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 const FIRED_MILESTONES = new Set<string>();
 const milestoneKey = (campaignId: bigint, m: MilestonePercent) => `${campaignId.toString()}:${m}`;
@@ -233,19 +234,23 @@ export function DonateModal({
         }}
       >
         <DialogTrigger asChild>
-          <Button
-            className="flex-1"
-            disabled={!address || isWrongNetwork}
-            title={
-              !address
-                ? "Connect your wallet to donate"
-                : isWrongNetwork
-                  ? "Switch to the correct network to donate"
-                  : undefined
-            }
-          >
-            Donate Now
-          </Button>
+          <Tooltip>
+            <TooltipTrigger className="relative flex-1">
+              <Button
+                className="w-full"
+                disabled={!address || isWrongNetwork}
+              >
+                Donate Now
+              </Button>
+            </TooltipTrigger>
+            {(!address || isWrongNetwork) && (
+              <TooltipContent side="top">
+                {!address
+                  ? "Connect your wallet to donate"
+                  : "Switch to the correct network to donate"}
+              </TooltipContent>
+            )}
+          </Tooltip>
         </DialogTrigger>
         <DialogContent
           aria-labelledby="donate-dialog-title"
