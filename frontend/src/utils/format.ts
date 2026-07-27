@@ -2,6 +2,29 @@ export const formatStroop = (stroop: bigint): string => {
   return (Number(stroop) / 10_000_000).toFixed(7);
 };
 
+/**
+ * The Stellar protocol's canonical "null" address — used as a placeholder
+ * when no real address is present (e.g. anonymous donations, zero-value fields).
+ * Centralised here so every consumer uses the same constant and tests can
+ * import it directly.
+ */
+export const ZERO_ADDRESS =
+  "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
+
+/**
+ * Returns a normalised Stellar G-address, or `null` if the value is absent,
+ * the zero-address placeholder, or not a valid 56-char G-address.
+ *
+ * Use this anywhere an on-chain address field could legitimately be the
+ * protocol zero-address (anonymous donations, unclaimed beneficiaries, etc.).
+ */
+export function normalizeAddress(value: unknown): string | null {
+  if (!value) return null;
+  const str = value.toString();
+  if (str === ZERO_ADDRESS) return null;
+  return str.length === 56 && str.startsWith("G") ? str : null;
+}
+
 export const formatAddress = (address: string): string => {
   if (!address || address.length < 10) return address;
   return `${address.slice(0, 4)}...${address.slice(-4)}`;

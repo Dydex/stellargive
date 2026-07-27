@@ -22,16 +22,8 @@ import {
 import { AddressLink } from "@/components/AddressLink";
 import { useWallet } from "@/lib/WalletProvider";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { normalizeAddress } from "@/utils/format";
 import { AlertCircle, RotateCw, UserCircle, Wallet, HandCoins, TrendingUp, Megaphone } from "lucide-react";
-
-const ZERO_ADDRESS = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
-
-function normalizeAddress(value: unknown): string | null {
-  if (!value) return null;
-  const str = value.toString();
-  if (str === ZERO_ADDRESS) return null;
-  return str.length === 56 && str.startsWith("G") ? str : null;
-}
 
 export default function ProfilePage() {
   const { address, isConnected } = useWallet();

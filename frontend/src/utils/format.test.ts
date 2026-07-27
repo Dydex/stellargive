@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { formatStroop, formatAddress, formatXLM, formatTokenAmount, toRawAmount } from "./format";
+import {
+  formatStroop,
+  formatAddress,
+  formatXLM,
+  formatTokenAmount,
+  toRawAmount,
+  ZERO_ADDRESS,
+  normalizeAddress,
+} from "./format";
 
 describe("format utils", () => {
   describe("formatStroop", () => {
@@ -82,6 +90,44 @@ describe("format utils", () => {
       expect(() => toRawAmount("abc", 7)).toThrow("Invalid amount: not a number");
       expect(() => toRawAmount("1.123", 2)).toThrow("Invalid amount: exceeds 2 decimal places");
       expect(() => toRawAmount("", 7)).toThrow("Invalid amount: not a number");
+    });
+  });
+
+  describe("normalizeAddress", () => {
+    it("returns null for the zero-address placeholder", () => {
+      expect(normalizeAddress(ZERO_ADDRESS)).toBeNull();
+    });
+
+    it("returns null for falsy values", () => {
+      expect(normalizeAddress(null)).toBeNull();
+      expect(normalizeAddress(undefined)).toBeNull();
+      expect(normalizeAddress("")).toBeNull();
+      expect(normalizeAddress(0)).toBeNull();
+    });
+
+    it("returns null for strings that are not valid G-addresses", () => {
+      // Too short
+      expect(normalizeAddress("GABC")).toBeNull();
+      // Wrong prefix
+      expect(normalizeAddress("XAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF")).toBeNull();
+      // Correct length but wrong prefix
+      expect(normalizeAddress("BAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF")).toBeNull();
+    });
+
+    it("returns the address string for a valid 56-char G-address", () => {
+      const valid = "GBWMCCC3NHSKLAOJDBKKYW7SSH2PFTTNVFKWKPKQZT4QDKXV4STPEQ";
+      expect(normalizeAddress(valid)).toBe(valid);
+    });
+
+    it("coerces non-string inputs via toString before validating", () => {
+      const valid = "GBWMCCC3NHSKLAOJDBKKYW7SSH2PFTTNVFKWKPKQZT4QDKXV4STPEQ";
+      const wrapper = { toString: () => valid };
+      expect(normalizeAddress(wrapper)).toBe(valid);
+    });
+
+    it("returns null when toString produces the zero-address", () => {
+      const wrapper = { toString: () => ZERO_ADDRESS };
+      expect(normalizeAddress(wrapper)).toBeNull();
     });
   });
 });

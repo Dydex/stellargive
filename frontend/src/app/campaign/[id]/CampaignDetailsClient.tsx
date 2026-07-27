@@ -20,7 +20,7 @@ import { Loader2, ImageIcon, Zap, AlertTriangle, RotateCw } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { formatBasisPoints } from "@/utils/format";
+import { formatBasisPoints, ZERO_ADDRESS } from "@/utils/format";
 import { calculateProgress, getCampaignImageUrl, CAMPAIGN_IMAGE_BLUR_DATA_URL } from "@/lib/utils";
 import dynamic from "next/dynamic";
 const RecentDonations = dynamic(
@@ -56,7 +56,7 @@ function TopDonors({ campaignId }: { campaignId: bigint }) {
       (acc: any, event: any) => {
         const donor = event.data[1]?.toString();
         const amount = BigInt(event.data[2]);
-        if (donor && donor !== "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF") {
+        if (donor && donor !== ZERO_ADDRESS) {
           acc[donor] = (acc[donor] || 0n) + amount;
         }
         return acc;
