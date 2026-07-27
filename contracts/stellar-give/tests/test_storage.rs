@@ -249,3 +249,35 @@ fn test_donor_contribution_ttl_extended_by_read() {
         "donor contribution TTL must be set after donation"
     );
 }
+
+#[test]
+fn test_next_id_migration_from_persistent() {
+    let (env, client, creator, beneficiary, _donor, _admin, token_client, _) = register_and_setup();
+    set_timestamp(&env, 1_000);
+
+    env.as_contract(&client.address, || {
+        env.storage().persistent().set(&symbol_short!("NEXT"), &42_u64);
+    });
+
+    client.get_total_campaigns();
+
+    let migrated: u64 = env.as_contract(&client.address, || {
+        env.storage().instance().get(&symbol_short!("NEXT")).unwrap()
+    });
+    assert_eq!(migrated, 42);
+
+    let persisted = env.as_contract(&client.address, || {
+        env.storage().persistent().has(&symbol_short!("NEXT"))
+    });
+    assert!(!persisted, "persistent NEXT must be removed after migration");
+
+    let campaign_id = create_default_campaign(
+        &env,
+        &client,
+        &creator,
+        &beneficiary,
+        &token_client.address,
+        2_000,
+    );
+    assert_eq!(campaign_id, 42);
+}
