@@ -19,6 +19,27 @@ vi.mock("./CampaignCard", () => ({
   CampaignCard: ({ campaign }: any) => <div data-testid="campaign-card">{campaign.title}</div>,
 }));
 
+// Mock CampaignSkeletonGrid for loading state assertions
+vi.mock("./CampaignSkeleton", () => ({
+  CampaignSkeletonGrid: ({ count }: { count?: number }) => (
+    <div data-testid="skeleton-grid" data-count={count ?? 6}>
+      {Array.from({ length: count ?? 6 }).map((_, i) => (
+        <div key={i} data-testid="campaign-skeleton" />
+      ))}
+    </div>
+  ),
+}));
+
+// Dynamic mock for useRecentCampaigns — tests can override via mockRecentCampaignsReturn
+let mockRecentCampaignsReturn: any = { data: undefined, isLoading: true, error: null };
+vi.mock("@/hooks/useSoroban", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/hooks/useSoroban")>();
+  return {
+    ...actual,
+    useRecentCampaigns: () => mockRecentCampaignsReturn,
+  };
+});
+
 // Mock next/navigation
 const replaceMock = vi.fn();
 let currentParams = new URLSearchParams();
@@ -50,6 +71,7 @@ beforeEach(() => {
   replaceMock.mockClear();
   currentParams = new URLSearchParams();
   setMockCampaigns([]);
+  mockRecentCampaignsReturn = { data: undefined, isLoading: true, error: null };
   vi.resetAllMocks();
 });
 
@@ -161,6 +183,14 @@ describe("CampaignList - Search & URL sync", () => {
 
   it("initializes the query from the ?q= URL param on load", async () => {
     currentParams = new URLSearchParams("q=school");
+    mockRecentCampaignsReturn = {
+      data: [
+        buildCampaign({ id: 1n, title: "Flood Relief" }),
+        buildCampaign({ id: 2n, title: "School Supplies" }),
+      ],
+      isLoading: false,
+      error: null,
+    };
     const Wrapper = makeWrapper();
     render(<CampaignList />, { wrapper: Wrapper });
 
@@ -169,5 +199,101 @@ describe("CampaignList - Search & URL sync", () => {
     });
     expect(screen.getByPlaceholderText(/Search campaigns/i)).toHaveValue("school");
     expect(screen.queryByText("Flood Relief")).not.toBeInTheDocument();
+  });
+});
+
+describe("CampaignList - Loading skeleton", () => {
+  it("renders skeleton grid while campaigns are loading", () => {
+    mockRecentCampaignsReturn = { data: undefined, isLoading: true, error: null };
+    const Wrapper = makeWrapper();
+    render(<CampaignList />, { wrapper: Wrapper });
+
+    expect(screen.getByTestId("skeleton-grid")).toBeInTheDocument();
+    const skeletons = screen.getAllByTestId("campaign-skeleton");
+    expect(skeletons.length).toBe(6);
+  });
+
+  it("hides skeleton grid after data loads", async () => {
+    mockRecentCampaignsReturn = {
+      data: [buildCampaign({ id: 1n, title: "Flood Relief" })],
+      isLoading: false,
+      error: null,
+    };
+    const Wrapper = makeWrapper();
+    render(<CampaignList />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("Flood Relief")).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("skeleton-grid")).not.toBeInTheDocument();
+  });
+});
+
+describe("CampaignList - Error state", () => {
+  it("renders error message when query fails", () => {
+    mockRecentCampaignsReturn = {
+      data: undefined,
+      isLoading: false,
+      error: new Error("Network failure"),
+    };
+    const Wrapper = makeWrapper();
+    render(<CampaignList />, { wrapper: Wrapper });
+
+    expect(screen.getByText(/Failed to load campaigns/i)).toBeInTheDocument();
+    expect(screen.getByText(/Please ensure you are on Testnet/i)).toBeInTheDocument();
+  });
+
+  it("does not render campaign cards or skeleton when error occurs", () => {
+    mockRecentCampaignsReturn = {
+      data: undefined,
+      isLoading: false,
+      error: new Error("RPC error"),
+    };
+    const Wrapper = makeWrapper();
+    render(<CampaignList />, { wrapper: Wrapper });
+
+    expect(screen.queryByTestId("campaign-card")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("skeleton-grid")).not.toBeInTheDocument();
+  });
+});
+
+describe("CampaignList - Empty state", () => {
+  it("renders empty state when campaigns array is empty", () => {
+    mockRecentCampaignsReturn = {
+      data: [],
+      isLoading: false,
+      error: null,
+    };
+    const Wrapper = makeWrapper();
+    render(<CampaignList />, { wrapper: Wrapper });
+
+    expect(screen.getByText(/No campaigns found/i)).toBeInTheDocument();
+    expect(screen.getByText(/Why not create the first one\?/i)).toBeInTheDocument();
+    const createButton = screen.getByRole("link", { name: /Create campaign/i });
+    expect(createButton).toHaveAttribute("href", "/create");
+  });
+
+  it("does not show load-more button when campaigns list is empty", () => {
+    mockRecentCampaignsReturn = {
+      data: [],
+      isLoading: false,
+      error: null,
+    };
+    const Wrapper = makeWrapper();
+    render(<CampaignList />, { wrapper: Wrapper });
+
+    expect(screen.queryByRole("button", { name: /load more/i })).not.toBeInTheDocument();
+  });
+
+  it("does not show skeleton when empty state is displayed", () => {
+    mockRecentCampaignsReturn = {
+      data: [],
+      isLoading: false,
+      error: null,
+    };
+    const Wrapper = makeWrapper();
+    render(<CampaignList />, { wrapper: Wrapper });
+
+    expect(screen.queryByTestId("skeleton-grid")).not.toBeInTheDocument();
   });
 });
